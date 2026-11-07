@@ -56,7 +56,7 @@ jobs:
       - name: Install the build tools
         run: |
           brew install xcodegen zstd spirv-cross glslang
-          python -m pip install -q lz4 capstone fonttools cryptography
+          python -m pip install -q lz4 capstone fonttools cryptography zbic
           # Xcode 26 and later install the Metal compiler separately
           xcrun -sdk iphoneos metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
           xcodebuild -version
