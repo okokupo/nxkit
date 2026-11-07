@@ -176,8 +176,16 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     env = dict(os.environ); env.setdefault('USER', getpass.getuser()); env.setdefault('J', str(os.cpu_count() or 8))
     py = sys.executable
 
-    app, fam = B.scan_nsps(nsp_dir)
-    fam = B.decompress_nsz(nsp_dir, app, fam, keys, env)
+    dump = B.pack_dump.is_dump(nsp_dir) and not B.files_with_suffix(nsp_dir, *B.PACKAGE_SUFFIXES)   # nxkit-jamboree: a dump folder (extracted game files) instead of NSPs
+    if dump:
+        app, fam = B.scan_dump(nsp_dir)
+        B.say(f'a dump folder: {app:016X}, {len(fam["updates"])} update(s), {len(fam["dlc"])} DLC')
+    else:
+        with B.package_reader(repo, keys, env) as packages:
+            app, fam = B.scan_nsps(nsp_dir, packages.contents)
+            packages.check_keys(fam)
+    if not dump:
+        fam = B.decompress_nsz(nsp_dir, app, fam, keys, env)
     g = gamemod.by_title(app)
     alias = None if g else B.same_build(nsp_dir, app, fam, keys, repo, env)
     if alias: g = alias[0]; B.say(f'no game profile for {app:016X}, but its main build is game profile {g.id}\'s {alias[1]} ({g.get("name", "")})')
@@ -196,7 +204,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     B.say(f'game profile: {g.id} ({g.get("name", "")}){" (provisional: " + str(g.dir) + ")" if provisional else ""}')
     apply_patches(repo, g.id)   # the game's own patches (patches/<title ID>): its code patches and split fixes are needed from the rewrite on
     builds, need = g.builds(), g.words('shader_versions')
-    have, derived = B.nsp_versions(fam, builds), False
+    have, derived = B.nsp_versions(fam), False
     pkg_ver = package or (g.get('package') if provisional else max(have, key=B.vnum))
     if pkg_ver not in have: raise KitError(f'version {pkg_ver} is not in the folder, which holds {", ".join(sorted(have, key=B.vnum))}')
     if provisional: derived = 'provisional'   # downstream it is handled like a derived profile: its own shader tables, copied into the kit
@@ -217,7 +225,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     B.PROG.stage('build nx_extract')
     nx = B.build_nx_extract(repo, work, logs, env)
     B.PROG.end()
-    dirs = {v: B.extract(nx, keys, ex, v, *picks[v], None, logs, g) for v in versions}
+    dirs = {v: (B.extract_dump(ex, v, (lambda b, u: u or b)(*picks[v]), app) if dump else B.extract(nx, keys, ex, v, *picks[v], None, logs, g, app)) for v in versions}
     bad = [f'{v}: {x}' for v in versions for x in B.build_mismatch(dirs[v], v, g)] if provisional or not derived else []
     if bad and provisional: raise KitError(f'not the builds provisional game profile {g.id} registers: {"; ".join(bad)}')
     if bad:
@@ -336,6 +344,15 @@ def apply_patches(repo, game=None):
     for p in patch_files(game):
         if p in _APPLIED: continue
         if subprocess.run(['git', '-C', repo, 'apply', '--reverse', '--check', p], capture_output=True).returncode == 0: _APPLIED.add(p); continue   # already applied
+        # nxkit-jamboree: context lines may have drifted (a later patch touched the same area). If the patch's added lines are already in the tree, treat it as applied
+        import subprocess as _sp2
+        plus = [l[1:] for l in p.read_text(encoding='utf-8').splitlines() if l.startswith('+') and not l.startswith('+++')]
+        sample = [l.strip() for l in plus if len(l.strip()) > 24][:8]
+        if sample:
+            found = sum(1 for line in sample if _sp2.run(['grep', '-rFq', '-m1', line, str(repo / 'dm')], capture_output=True).returncode == 0)
+            if found >= len(sample) - 2 and found >= len(sample) // 2:
+                say(f'{p.relative_to(HERE / "patches").as_posix()}: content already present, treating as applied')
+                _APPLIED.add(p); continue
         r = subprocess.run(['git', '-C', repo, 'apply', p], capture_output=True, text=True)
         if r.returncode: raise KitError(f'{p.relative_to(HERE / "patches").as_posix()} does not apply to this nxnative commit: {r.stderr.strip()[-300:]}')
         _APPLIED.add(p)
@@ -414,7 +431,7 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
                 zi = zipfile.ZipInfo(name + fn, date_time=dos_time(p))
                 zi.create_system, zi.external_attr = 3, 0o100644 << 16
                 zi.compress_type = zipfile.ZIP_STORED if fn.lower().endswith(store) else zipfile.ZIP_DEFLATED
-                zi.compress_level = 6
+                zi._compresslevel = 6   # py<3.13: ZipInfo.compress_level does not exist yet (the Mac runner builds on 3.14)
                 with open(p, 'rb') as f, z.open(zi, 'w', force_zip64=size >= 1 << 31) as o: shutil.copyfileobj(f, o, 16 << 20)
                 done += size
                 if time.time() - shown > 10:
@@ -424,7 +441,8 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
         for info in zin.infolist():
             if info.filename.startswith((APP + 'romfs/', APP + 'aoc/', SYSDATA)): continue
             zi = zipfile.ZipInfo(info.filename, date_time=info.date_time)
-            zi.create_system, zi.external_attr, zi.compress_type, zi.compress_level = info.create_system, info.external_attr, info.compress_type, 6
+            zi.create_system, zi.external_attr, zi.compress_type = info.create_system, info.external_attr, info.compress_type
+            zi._compresslevel = 6   # py<3.13
             if info.is_dir(): z.writestr(zi, b''); continue
             with zin.open(info) as f, z.open(zi, 'w', force_zip64=info.file_size >= 1 << 31) as o: shutil.copyfileobj(f, o, 16 << 20)
         add_tree(z, romfs, APP + 'romfs/')
