@@ -117,6 +117,7 @@ jobs:
       - name: Build the slim IPA
         env:
           NXKIT_CACHE: ${{ runner.temp }}/nxcache
+          DM_ALLOW_OTHER_METAL: '1'   # bd979ce's dmsh_chain.lock wants Metal 32023.922 (Xcode 27.2); the macos-26 runner ships 32023.883 (Xcode 26.6)
         run: python nxkit/nxkit.py build nxnative "$RUNNER_TEMP/kit" -o "$RUNNER_TEMP/slim.ipa" < /dev/null
 
       - name: Encrypt the IPA
