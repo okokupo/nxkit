@@ -26,7 +26,7 @@ defaults:
 
 jobs:
   build:
-    runs-on: macos-26   # the runner nxnative's own CI builds its iOS app on
+    runs-on: xcode-27   # the runner nxnative's own CI builds its iOS app on
     timeout-minutes: 240
     steps:
       - name: Get nxkit
