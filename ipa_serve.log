@@ -1,0 +1,538 @@
+[ipa-serve] 127.0.0.1:8787  token-path=/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa  size=6810444247
+[ipa-serve] 127.0.0.1 "HEAD /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "HEAD /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /WRONG/x HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa](https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /favicon.ico HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 46758)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 39524)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 49972)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /favicon.ico HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /apple-touch-icon.png HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 37942)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 32942)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 32950)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 32952)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 58102)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 code 404, message Not Found
+[ipa-serve] 127.0.0.1 "GET / HTTP/1.1" 404 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 32970)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 32986)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 48778)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 35752)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 33012)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 37664)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 50342)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 58112)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 60556)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 60544)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 34742)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 60540)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 34756)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 34734)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 206 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+[ipa-serve] 127.0.0.1 "GET /506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 35808)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 35812)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/socketserver.py", line 692, in process_request_thread
+    self.finish_request(request, client_address)
+  File "/usr/lib/python3.12/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "/usr/lib/python3.12/socketserver.py", line 761, in __init__
+    self.handle()
+  File "/usr/lib/python3.12/http/server.py", line 436, in handle
+    self.handle_one_request()
+  File "/usr/lib/python3.12/http/server.py", line 424, in handle_one_request
+    method()
+  File "/root/nxkit/ipa_serve.py", line 40, in do_GET
+    try: self.wfile.write(chunk)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socketserver.py", line 840, in write
+    self._sock.sendall(b)
+ConnectionResetError: [Errno 104] Connection reset by peer
+----------------------------------------

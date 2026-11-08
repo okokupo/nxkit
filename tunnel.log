@@ -1,0 +1,97 @@
+2026-11-08T07:03:38Z INF Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee, are subject to the Cloudflare Online Services Terms of Use (https://www.cloudflare.com/website-terms/), and Cloudflare reserves the right to investigate your use of Tunnels for violations of such terms. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps
+2026-11-08T07:03:38Z INF Requesting new quick Tunnel on trycloudflare.com...
+2026-11-08T07:03:44Z INF +--------------------------------------------------------------------------------------------+
+2026-11-08T07:03:44Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+2026-11-08T07:03:44Z INF |  https://randy-regulations-designs-merit.trycloudflare.com                                 |
+2026-11-08T07:03:44Z INF +--------------------------------------------------------------------------------------------+
+2026-11-08T07:03:44Z INF Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp /etc/cloudflared /usr/local/etc/cloudflared]
+2026-11-08T07:03:44Z INF Version 2026.10.7 (Checksum 1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872)
+2026-11-08T07:03:44Z INF GOOS: linux, GOVersion: go1.27.3, GoArch: amd64
+2026-11-08T07:03:44Z INF Settings: map[ha-connections:1 no-autoupdate:true protocol:quic url:http://127.0.0.1:8787]
+2026-11-08T07:03:44Z INF Generated Connector ID: 8af7afdc-1b41-4cc4-a63d-37f418498e19
+2026-11-08T07:03:44Z INF Initial protocol quic
+2026-11-08T07:03:44Z INF ICMP proxy will use 10.3.0.16 as source for IPv4
+2026-11-08T07:03:44Z INF ICMP proxy will use fe80::5054:ff:fe1a:92cf in zone eth0 as source for IPv6
+2026-11-08T07:03:44Z WRN The user running cloudflared process has a GID (group ID) that is not within ping_group_range. You might need to add that user to a group within that range, or instead update the range to encompass a group the user is already in by modifying /proc/sys/net/ipv4/ping_group_range. Otherwise cloudflared will not be able to ping this network error="Group ID 0 is not between ping group 1 to 0"
+2026-11-08T07:03:44Z WRN ICMP proxy feature is disabled error="cannot create ICMPv4 proxy: Group ID 0 is not between ping group 1 to 0 nor ICMPv6 proxy: socket: permission denied"
+2026-11-08T07:03:44Z INF ICMP proxy will use 10.3.0.16 as source for IPv4
+2026-11-08T07:03:44Z INF ICMP proxy will use fe80::5054:ff:fe1a:92cf in zone eth0 as source for IPv6
+2026-11-08T07:03:44Z INF Starting metrics server on 127.0.0.1:20241/metrics
+2026-11-08T07:03:44Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.67
+2026-11-08T07:03:45Z INF Registered tunnel connection connIndex=0 connection=0a24663d-ff07-421f-aef0-469b981e0ce1 event=0 ip=198.41.192.67 location=sin09 protocol=quic
+2026-11-08T07:03:50Z INF +-------------------------------------------------------------------------------------+
+2026-11-08T07:03:50Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+2026-11-08T07:03:50Z INF +-------------------------------------------------------------------------------------+
+2026-11-08T07:03:50Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+2026-11-08T07:03:50Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-11-08T07:03:50Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-11-08T07:03:50Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-11-08T07:03:50Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-11-08T07:03:50Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-11-08T07:03:50Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-11-08T07:03:50Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+2026-11-08T07:03:50Z INF |                                                                                     |
+2026-11-08T07:03:50Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+2026-11-08T07:03:50Z INF +-------------------------------------------------------------------------------------+
+2026-11-08T07:03:50Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region1.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region2.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region1.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region2.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region1.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=region2.v2.argotunnel.com
+2026-11-08T07:03:50Z INF precheck component="Cloudflare API" details="API is reachable" run_id=787ef457-c313-4036-ace9-c145ba46a2da status=pass target=api.cloudflare.com:443
+2026-11-08T07:03:50Z INF precheck complete hard_fail=false run_id=787ef457-c313-4036-ace9-c145ba46a2da suggested_protocol=quic
+2026-11-08T07:07:12Z ERR  error="stream 21 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:07:12Z ERR Request failed error="stream 21 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:14:29Z ERR  error="stream 25 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:14:29Z ERR Request failed error="stream 25 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:17:39Z ERR  error="stream 29 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:17:39Z ERR Request failed error="stream 29 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:27:35Z ERR  error="stream 45 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:27:35Z ERR Request failed error="stream 45 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:34:52Z ERR  error="stream 49 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:34:52Z ERR Request failed error="stream 49 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:34:52Z ERR  error="stream 53 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:34:52Z ERR Request failed error="stream 53 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:34:54Z ERR  error="stream 57 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:34:54Z ERR Request failed error="stream 57 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:35:06Z ERR  error="stream 85 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:35:06Z ERR Request failed error="stream 85 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:54:46Z ERR  error="stream 65 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:54:46Z ERR Request failed error="stream 65 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:55:00Z ERR  error="stream 69 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:55:00Z ERR Request failed error="stream 69 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:55:17Z ERR  error="stream 113 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:55:17Z ERR Request failed error="stream 113 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:55:31Z ERR  error="stream 117 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:55:31Z ERR Request failed error="stream 117 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:55:33Z ERR  error="stream 81 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:55:33Z ERR Request failed error="stream 81 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:55:49Z ERR  error="stream 121 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:55:49Z ERR Request failed error="stream 121 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T07:56:03Z ERR  error="stream 125 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T07:56:03Z ERR Request failed error="stream 125 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:14:00Z ERR  error="stream 89 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:14:00Z ERR Request failed error="stream 89 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:30:42Z ERR  error="stream 101 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:30:42Z ERR Request failed error="stream 101 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:30:44Z ERR  error="stream 97 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:30:44Z ERR Request failed error="stream 97 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:31:59Z ERR  error="stream 145 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:31:59Z ERR Request failed error="stream 145 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:32:36Z ERR  error="stream 93 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:32:36Z ERR Request failed error="stream 93 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:32:37Z ERR  error="stream 149 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:32:37Z ERR Request failed error="stream 149 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T08:32:45Z ERR  error="stream 141 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T08:32:45Z ERR Request failed error="stream 141 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T09:04:50Z ERR  error="stream 177 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T09:04:50Z ERR Request failed error="stream 177 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T09:04:50Z ERR  error="stream 181 canceled by remote with error code 0" connIndex=0 event=1 ingressRule=0 originService=http://127.0.0.1:8787
+2026-11-08T09:04:50Z ERR Request failed error="stream 181 canceled by remote with error code 0" connIndex=0 dest=https://randy-regulations-designs-merit.trycloudflare.com/506fa8fb5ef48132959c4f04/SuperMarioPartyJamboree-v4.1-zh.ipa event=0 ip=198.41.192.67 type=http
+2026-11-08T09:15:28Z INF Initiating graceful shutdown due to signal terminated ...
+2026-11-08T09:15:28Z INF Retrying connection in up to 2s connIndex=0 event=0 ip=198.41.192.67
+2026-11-08T09:15:28Z ERR Connection terminated connIndex=0
+2026-11-08T09:15:28Z ERR no more connections active and exiting
+2026-11-08T09:15:28Z INF Tunnel server stopped
+2026-11-08T09:15:28Z INF Metrics server stopped

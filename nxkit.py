@@ -18,7 +18,7 @@ import argparse, getpass, json, os, re, secrets, shutil, struct, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-NXNATIVE_REF = 'bd979ced3ae6bad60bf86429a71d172297d93471'   # the nxnative commit patches/ are made for: main moves several times a day and can break them (--nxnative-ref main: the newest)
+NXNATIVE_REF = '02f884451749c2cfbc4fb4e3e557c4db159181b5'   # derron/nxnative codex/diablo3-support head (f108343 2026-11-02 main + one D3 commit, issue seedds/nxnative#937)
 CONFIG = HERE / 'nxkit.local.json'     # home folder, repository and kit password (never committed: see .gitignore)
 APP = 'Payload/DmIOS.app/'             # the app folder inside the IPA (dm/ios/tools/build_ipa.sh)
 SYSDATA = APP + 'dm/sysdata/'          # system data archives from the player's own firmware (nxkit.py sysdata; the host's hle_fs.c mounts them, patch 0023)
