@@ -183,7 +183,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     else:
         app, fam = B.scan_nsps(nsp_dir)   # old base: no package reader context; keys are validated by nx_extract itself
     if not dump:
-        nsp_local = kit_zip.parent   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages
+        nsp_local = kit_zip   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages
     fam = B.decompress_nsz(nsp_dir, app, fam, keys, env, work=nsp_local)
     g = gamemod.by_title(app)
     alias = None if g else B.same_build(nsp_dir, app, fam, keys, repo, env)
