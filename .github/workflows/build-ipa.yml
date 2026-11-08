@@ -15,6 +15,10 @@ on:
       nxnative_ref:
         description: 'nxnative commit the kit was prepared with'
         required: true
+      nxnative_repo:
+        description: 'optional repo holding the commit (e.g. a combined-tree branch on this repo); default seedds/nxnative'
+        required: false
+        default: ''
 
 permissions:
   contents: write   # deletes the kit's release
@@ -38,7 +42,7 @@ jobs:
       - name: Get nxnative at the kit's commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: seedds/nxnative
+          repository: ${{ inputs.nxnative_repo || 'seedds/nxnative' }}
           ref: ${{ inputs.nxnative_ref }}
           path: nxnative
           persist-credentials: false

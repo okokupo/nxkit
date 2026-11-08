@@ -18,7 +18,7 @@ import argparse, getpass, json, os, re, secrets, shutil, struct, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-NXNATIVE_REF = '02f884451749c2cfbc4fb4e3e557c4db159181b5'   # derron/nxnative codex/diablo3-support head (f108343 2026-11-02 main + one D3 commit, issue seedds/nxnative#937)
+NXNATIVE_REF = '624e9f4836c82905a60de513316af0ab2d5036f9'   # d3-all local branch: derron D3 (02f88445) + guest-file (bf28ad41) + Switch2 Pro (624e9f48); cloud fetches same tree as orphan 07473ab8 on okokupo/nxkit branch nxn-d3-combined
 CONFIG = HERE / 'nxkit.local.json'     # home folder, repository and kit password (never committed: see .gitignore)
 APP = 'Payload/DmIOS.app/'             # the app folder inside the IPA (dm/ios/tools/build_ipa.sh)
 SYSDATA = APP + 'dm/sysdata/'          # system data archives from the player's own firmware (nxkit.py sysdata; the host's hle_fs.c mounts them, patch 0023)
