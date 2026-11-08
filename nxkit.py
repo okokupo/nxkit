@@ -183,7 +183,8 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     else:
         app, fam = B.scan_nsps(nsp_dir)   # old base: no package reader context; keys are validated by nx_extract itself
     if not dump:
-        fam = B.decompress_nsz(nsp_dir, app, fam, keys, env)
+        nsp_local = Path(a.out).resolve()   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages
+    fam = B.decompress_nsz(nsp_dir, app, fam, keys, env, work=nsp_local)
     g = gamemod.by_title(app)
     alias = None if g else B.same_build(nsp_dir, app, fam, keys, repo, env)
     if alias: g = alias[0]; B.say(f'no game profile for {app:016X}, but its main build is game profile {g.id}\'s {alias[1]} ({g.get("name", "")})')
@@ -224,6 +225,8 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     nx = B.build_nx_extract(repo, work, logs, env)
     B.PROG.end()
     dirs = {v: (B.extract_dump(ex, v, (lambda b, u: u or b)(*picks[v]), app) if dump else B.extract(nx, keys, ex, v, *picks[v], None, logs, g, app)) for v in versions}
+    for p in [fam['base']] + [p for _, p in fam['updates']]:   # nxkit-d3 rolling cleanup: the base + update packages are fully consumed by the extracts above
+        if p.resolve().parent == (nsp_local / 'nsp'): B.say(f'extract done with {p.name}, freeing it'); p.unlink()
     bad = [f'{v}: {x}' for v in versions for x in B.build_mismatch(dirs[v], v, g)] if provisional or not derived else []
     if bad and provisional: raise KitError(f'not the builds provisional game profile {g.id} registers: {"; ".join(bad)}')
     if bad:
@@ -248,6 +251,8 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     if gfx == 'gl': raise KitError('OpenGL games are not supported by nxkit yet (their GLSL is spread over the RomFS and main)')
 
     aoc = B.extract_aoc(nx, keys, repo, work, app, fam, logs)
+    for _, _, p in fam['dlc']:   # nxkit-d3 rolling cleanup: the DLC packages are consumed
+        if p.resolve().parent == (nsp_local / 'nsp'): B.say(f'aoc done with {p.name}, freeing it'); p.unlink()
     base = next((dirs[v] for v in versions if picks[v][1] is None), dirs[versions[0]])
     app_name = app_name or nacp.name(base / 'control.nacp')
     if not app_name: raise KitError(f'no game name in {base / "control.nacp"}: give --app-name')
