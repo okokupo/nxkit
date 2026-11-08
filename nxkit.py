@@ -176,14 +176,12 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     env = dict(os.environ); env.setdefault('USER', getpass.getuser()); env.setdefault('J', str(os.cpu_count() or 8))
     py = sys.executable
 
-    dump = B.pack_dump.is_dump(nsp_dir) and not B.files_with_suffix(nsp_dir, *B.PACKAGE_SUFFIXES)   # nxkit-jamboree: a dump folder (extracted game files) instead of NSPs
+    dump = B.dump_folder(nsp_dir)   # nxkit-jamboree: a dump folder (extracted game files) instead of NSPs; old-base equivalent of pack_dump.is_dump + files_with_suffix
     if dump:
         app, fam = B.scan_dump(nsp_dir)
         B.say(f'a dump folder: {app:016X}, {len(fam["updates"])} update(s), {len(fam["dlc"])} DLC')
     else:
-        with B.package_reader(repo, keys, env) as packages:
-            app, fam = B.scan_nsps(nsp_dir, packages.contents)
-            packages.check_keys(fam)
+        app, fam = B.scan_nsps(nsp_dir)   # old base: no package reader context; keys are validated by nx_extract itself
     if not dump:
         fam = B.decompress_nsz(nsp_dir, app, fam, keys, env)
     g = gamemod.by_title(app)
