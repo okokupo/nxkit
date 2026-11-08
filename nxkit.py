@@ -18,7 +18,7 @@ import argparse, getpass, json, os, re, secrets, shutil, struct, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-NXNATIVE_REF = '2db12f7efdf2acf50026ec10f515193d67f2a3b6'   # the nxnative commit patches/ are made for: main moves several times a day and can break them (--nxnative-ref main: the newest)
+NXNATIVE_REF = 'bd979ced3ae6bad60bf86429a71d172297d93471'   # the nxnative commit patches/ are made for: main moves several times a day and can break them (--nxnative-ref main: the newest)
 CONFIG = HERE / 'nxkit.local.json'     # home folder, repository and kit password (never committed: see .gitignore)
 APP = 'Payload/DmIOS.app/'             # the app folder inside the IPA (dm/ios/tools/build_ipa.sh)
 SYSDATA = APP + 'dm/sysdata/'          # system data archives from the player's own firmware (nxkit.py sysdata; the host's hle_fs.c mounts them, patch 0023)
@@ -265,7 +265,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
         B.provisional_prep(py, repo, env, logs, g)
         g = B.refine_after_rewrite(g, game, patched)
     if gfx == 'nvn':
-        B.split_shaders(py, repo, [dirs[v] / 'RomFS' for v in sv], [dirs[v] / 'ExeFS/main' for v in sv], work / 'shader/pkg', env, logs, g, bool(derived), None)
+        B.split_shaders(py, repo, [B.rfs.source(dirs[v]) for v in sv], [dirs[v] / 'ExeFS/main' for v in sv], work / 'shader/pkg', env, logs, g, bool(derived), None)
     icon = next((d / 'icon.jpg' for d in (game, base) if (d / 'icon.jpg').exists()), None)
 
     # The kit: what the Mac steps read, without the game files
@@ -414,7 +414,7 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
     a zip_store suffix stored, everything else deflated at level 6"""
     store = tuple(s.lower() for s in (store or '').split(':') if s)
     out = Path(out); tmp = out.with_name(out.name + '.partial')
-    total = sum(p.stat().st_size for root in (romfs, aoc) if root for p in Path(root).rglob('*') if p.is_file())
+    total = sum(p.stat().st_size for root in (romfs, aoc) if root and Path(root).is_dir() for p in Path(root).rglob('*') if p.is_file()) + (Path(romfs).stat().st_size if romfs and Path(romfs).is_file() else 0)
     done, t0, shown = 0, time.time(), 0
 
     def add_tree(z, root, arc):
@@ -444,8 +444,17 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
             zi.create_system, zi.external_attr, zi.compress_type = info.create_system, info.external_attr, info.compress_type
             zi._compresslevel = 6   # py<3.13
             if info.is_dir(): z.writestr(zi, b''); continue
+            if info.filename == APP + 'dm/launcher.json':   # 启动器设置页汉化（静态按钮字符串编译在二进制里，改不了）
+                t = translate_launcher_json(zin.read(info.filename))
+                z.writestr(zi, t); continue
             with zin.open(info) as f, z.open(zi, 'w', force_zip64=info.file_size >= 1 << 31) as o: shutil.copyfileobj(f, o, 16 << 20)
-        add_tree(z, romfs, APP + 'romfs/')
+        rf = Path(romfs) if romfs else None
+        if rf and rf.is_file() and rf.name == 'RomFS.img':   # nxnative bd979ce packs a romfs image, not a folder; the app mounts DmIOS.app/romfs.img directly (build_ipa.sh)
+            zi = zipfile.ZipInfo(APP + 'romfs.img', date_time=dos_time(rf)); zi.create_system, zi.external_attr = 3, 0o100644 << 16
+            done += rf.stat().st_size
+            with z.open(zi, 'w', force_zip64=rf.stat().st_size >= 1 << 31) as o, open(rf, 'rb') as f: shutil.copyfileobj(f, o, 16 << 20)
+            say(f'romfs.img → archive ({rf.stat().st_size / 2 ** 30:.2f} GB)')
+        elif rf: add_tree(z, romfs, APP + 'romfs/')
         if aoc and Path(aoc).is_dir(): add_tree(z, aoc, APP + 'aoc/')
         if sysdata and Path(sysdata).is_dir(): add_tree(z, sysdata, SYSDATA); say(f'system data from {sysdata}')
     tmp.replace(out)
@@ -455,6 +464,56 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
 def dos_time(p):
     t = time.localtime(max(p.stat().st_mtime, 315532800 + 86400))   # zip times start in 1980
     return t[:6]
+
+
+# ---- launcher.json 简体中文汉化（2026-11-08 Chen 指定，merge 阶段注入；未知字符串原样保留）----
+
+LAUNCHER_ZH = {
+    # 分组
+    'Game': '游戏', 'Controls': '控制', 'Performance': '性能',
+    # 设置项名（dm/games/settings.tsv label 列）
+    'Frame rate': '帧率', 'Dynamic resolution': '动态分辨率', 'Render scale': '渲染比例',
+    'Console mode': '主机模式', 'Upscaling': '画质增强', "Game's upscaler": '游戏自带增强',
+    'Game language': '游戏语言', 'Display mode': '显示模式', 'Picture': '画面适配',
+    'Frame-rate counter': '帧率显示', 'Touch feedback': '触摸反馈', 'Game rumble': '手柄震动',
+    'Rumble strength': '震动强度', 'Rumble cutoff': '震动截止', 'Press a button to join': '按键加入游戏',
+    'Picture shape': '画面比例', 'Frame buffering': '帧缓冲', 'Metal 4 pipelines': 'Metal 4 管线',
+    'Pipeline prebuild': '管线预构建', 'Encode thread': '编码线程', 'Hold frames when late': '落后时保持帧',
+    'Performance HUD': '性能悬浮窗',
+    # 选项名
+    'Docked': '电视底座', 'Handheld': '掌机', 'Standard': '标准', "Game's own": '游戏自带',
+    'Window': '窗口', 'Fullscreen': '全屏', 'Fit': '适配', 'Fill': '填满',
+    'Match screen': '跟随屏幕', 'iPhone Duo screen (1.43:1)': 'iPhone 双屏 (1.43:1)', '16:9 (Switch)': '16:9（Switch 原生）',
+    'on': '开', 'off': '关',
+    # 语言名（dm/tools/nacp.py LANGUAGES）
+    'American English': '美式英语', 'British English': '英式英语', 'Japanese': '日语', 'French': '法语',
+    'German': '德语', 'Latin American Spanish': '拉美西班牙语', 'Spanish': '西班牙语', 'Italian': '意大利语',
+    'Dutch': '荷兰语', 'Canadian French': '加拿大法语', 'Portuguese': '葡萄牙语', 'Russian': '俄语',
+    'Korean': '韩语', 'Traditional Chinese': '繁体中文', 'Simplified Chinese': '简体中文', 'Brazilian Portuguese': '巴西葡萄牙语',
+    # 说明文字（settings.tsv note 列 + settings.py UNKNOWN_LANGUAGES）
+    'Adjusts resolution between 70% and 100% under load. Turn off to keep full resolution for the selected console mode.': '负载高时在 70%–100% 间自动调低分辨率。关闭则以所选模式的全分辨率渲染。',
+    'Uses more GPU time and can increase heat.': '占用更多 GPU，机身可能更热。',
+    "Fill crops the game's 16:9 picture to cover the screen. Health bars, subtitles or maps near the edges can be cut off. A full-screen picture without cropping needs a patch for each game.": '“填满”会裁切 16:9 画面铺满屏幕，边缘的血条/字幕/地图可能被切掉。不裁切的全屏画面需要每款游戏单独补丁。',
+    'Renders about a quarter more pixels: a little slower and warmer.': '多渲染约四分之一的像素：稍慢、稍热。',
+    'Up to one frame more display latency.': '显示延迟最多多一帧。',
+    'Keeps a pipeline archive; uses more memory.': '保留管线存档，占用更多内存。',
+    'The first start waits a few minutes for it, once.': '仅首次启动多等几分钟。',
+    "This game's files do not list its languages, so some of these may not be in the game. It may then show another one.": '该游戏的文件未列出支持语言，部分选项游戏里可能没有，届时游戏会显示其他语言。',
+}
+
+def translate_launcher_json(data):
+    """launcher.json 的 section/label/note/选项标签译为简体中文；解析失败或未知字符串原样保留"""
+    try: j = json.loads(data)
+    except Exception: return data
+    n = 0
+    for s in j.get('settings') or []:
+        for k in ('section', 'label', 'note'):
+            v = s.get(k)
+            if v in LAUNCHER_ZH: s[k] = LAUNCHER_ZH[v]; n += 1
+        for o in s.get('options') or []:
+            if len(o) == 2 and o[1] in LAUNCHER_ZH: o[1] = LAUNCHER_ZH[o[1]]; n += 1
+    if n: say(f'launcher.json: {n} strings → 简体中文')
+    return json.dumps(j, ensure_ascii=False, indent=' ').encode('utf-8')
 
 
 # ---- PC: the whole build ----
