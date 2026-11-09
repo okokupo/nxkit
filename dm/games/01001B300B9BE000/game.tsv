@@ -1,0 +1,50 @@
+# Diablo III: Eternal Collection 2.7.7.92380, SDK 8.2.0, Blizzard engine / NVN.
+# Mac: hero creation and the first Act I scene; see README.md for validation.
+
+# ---- Identity ----
+title_id	01001B300B9BE000
+program_id	01001B300B9BE000
+
+# ---- App ----
+name	Diablo III: Eternal Collection
+ipa	DiabloIII.ipa
+app_category	public.app-category.games
+
+# ---- Versions ----
+build	v1441792	2.7.7.92380	main=2607a74f5df7754cc0357b5df7e49693	sdk=3ae34e689d7a35f13cbf42bfd672af8b
+package	v1441792
+shader_versions	v1441792
+
+# ---- Files ----
+# every module main imports from
+modules	main sdk
+romfs_marker	CPKs/Common.cpk
+zip_store	.cpk:.metallib
+
+# ---- Memory ----
+# the NPDM declares 16 MB of system resource (virtual address memory) and main sets a heap: a 5 GB block with a large alias region; the heap check sizes the heap region from the heap the game asks for
+mem_reserve	0x140000000
+mem_alias	0x118000000
+mem_stack	0x10000000
+app_pool	0xCD500000
+# the NPDM declares 16 MB of system resource
+sys_resource	0x1000000
+
+# ---- Shader split ----
+shader_groups	/CPKs/=cpks /Update/=update
+shader_note	Diablo III: Eternal Collection shaders
+
+# The game selects the zero-to-one clip-depth mode. Offline pipeline keys must
+# use that same mode (observed in the support-only Mac run).
+depth_mode	zero
+
+# heap check: 2026-10-29, no heap set
+
+# address regions: 2026-10-29, in its first 15 s in nnMain the game's regions reach alias +3.42 GB, within the profile's 4.38 GB alias region (what it takes later in play is not measured here) (rewrite 3b8d4bca473f)
+
+# CPU-written textures in CPU_CACHED | GPU_CACHED pools (0x24): at first use,
+# a 2048x2048 texture has 2,829,690 nonzero storage bytes but its GPU image is
+# all zero. The game writes after initialization without NVN texture uploads.
+# Track those writes through the existing dirty-page upload path.
+tex_flush_upload	on
+tex_dirty_upload	on
