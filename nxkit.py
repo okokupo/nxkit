@@ -183,7 +183,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     else:
         app, fam = B.scan_nsps(nsp_dir)   # old base: no package reader context; keys are validated by nx_extract itself
     if not dump:
-        nsp_local = kit_zip   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages
+        nsp_local = Path(os.environ['NXKIT_NSP_LOCAL']) if os.environ.get('NXKIT_NSP_LOCAL') else kit_zip   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages; NXKIT_NSP_LOCAL reuses a previous run's NSPs across restarts
     fam = B.decompress_nsz(nsp_dir, app, fam, keys, env, work=nsp_local)
     g = gamemod.by_title(app)
     alias = None if g else B.same_build(nsp_dir, app, fam, keys, repo, env)
@@ -203,7 +203,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     B.say(f'game profile: {g.id} ({g.get("name", "")}){" (provisional: " + str(g.dir) + ")" if provisional else ""}')
     apply_patches(repo, g.id)   # the game's own patches (patches/<title ID>): its code patches and split fixes are needed from the rewrite on
     builds, need = g.builds(), g.words('shader_versions')
-    have, derived = B.nsp_versions(fam), False
+    have, derived = B.nsp_versions(fam, builds), False   # nxkit-d3: the old base needs the profile's registered builds
     pkg_ver = package or (g.get('package') if provisional else max(have, key=B.vnum))
     if pkg_ver not in have: raise KitError(f'version {pkg_ver} is not in the folder, which holds {", ".join(sorted(have, key=B.vnum))}')
     if provisional: derived = 'provisional'   # downstream it is handled like a derived profile: its own shader tables, copied into the kit
@@ -212,20 +212,33 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     if alias and not derived: derived = f'title {app:016X} is not game profile {g.id}\'s title {g.title_id:016X}'
     if derived and not provisional: B.say(f'[RED] {derived}: packing {pkg_ver} from a profile derived from it (the game may need the update the profile names to run well)')
     versions = [pkg_ver] if derived else need + ([pkg_ver] if pkg_ver not in need else [])
-    work = nsp_dir / f'{g.id}_build'
+    work = Path(os.environ['NXKIT_WORK']) if os.environ.get('NXKIT_WORK') else nsp_dir / f'{g.id}_build'   # nxkit-d3: NXKIT_WORK keeps the working tree off a slow NSP share
     env.update(DM_GAME=g.id, DM_ROOT=str(work), WORK=str(work / 'tmp'))
     logs = work / 'logs'
     picks = B.pick_nsps(fam, have, versions)
     ex = work / 'extract'; ex.mkdir(parents=True, exist_ok=True); (work / 'tmp').mkdir(exist_ok=True)
     gb = sum({p.stat().st_size for b, u in picks.values() for p in (b, u) if p}) / 2 ** 30 * 2 + 4   # the extraction, then the finished IPA beside it
-    if B.free_gb(work) < gb and not all((ex / v).exists() for v in versions): raise KitError(f'less than {gb:.0f} GB free on the drive of {work}')
+    big = None   # nxkit-d3: big artifacts (extract tree, final IPA) spill to the laptop share when the local drive can't hold them; NSPs stay local and roll
+    try:
+        big = Path('/mnt/laptop-share/d3_build'); big.mkdir(parents=True, exist_ok=True); big_ok = B.free_gb(big) > 100
+    except OSError: big_ok = False
+    tight = B.free_gb(work) < gb and not all((ex / v).exists() for v in versions)
+    if tight and big_ok:
+        ex = big / 'extract'; ex.mkdir(parents=True, exist_ok=True)
+        B.say(f'[RED] local drive can\'t hold the extract tree (~{gb:.0f} GB): extraction goes to {ex} (share); NSPs stay local and roll')
+    elif tight:
+        raise KitError(f'less than {gb:.0f} GB free on the drive of {work}')
 
     B.PROG.plan(5 + len(versions))
     B.PROG.stage('build nx_extract')
     nx = B.build_nx_extract(repo, work, logs, env)
     B.PROG.end()
-    dirs = {v: (B.extract_dump(ex, v, (lambda b, u: u or b)(*picks[v]), app) if dump else B.extract(nx, keys, ex, v, *picks[v], None, logs, g, app)) for v in versions}
-    for p in [fam['base']] + [p for _, p in fam['updates']]:   # nxkit-d3 rolling cleanup: the base + update packages are fully consumed by the extracts above
+    dirs = {}
+    for v in versions:
+        dirs[v] = (B.extract_dump(ex, v, (lambda b, u: u or b)(*picks[v]), app) if dump else B.extract(nx, keys, ex, v, *picks[v], None, logs, g, app))
+        u = picks[v][1]   # nxkit-d3 rolling cleanup: this version's update package is consumed by its own extract; the base is shared and freed after the loop
+        if u and u.resolve().parent == (nsp_local / 'nsp'): B.say(f'extract done with {u.name}, freeing it'); u.unlink()
+    for p in [fam['base']]:   # nxkit-d3 rolling cleanup: the base package is fully consumed by the extracts above
         if p.resolve().parent == (nsp_local / 'nsp'): B.say(f'extract done with {p.name}, freeing it'); p.unlink()
     bad = [f'{v}: {x}' for v in versions for x in B.build_mismatch(dirs[v], v, g)] if provisional or not derived else []
     if bad and provisional: raise KitError(f'not the builds provisional game profile {g.id} registers: {"; ".join(bad)}')
@@ -297,7 +310,8 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     zip_dir(kit, kit_zip)
     B.rmtree(kit)
     B.PROG.end(f'{Path(kit_zip).stat().st_size / 2 ** 20:.0f} MB')
-    info = dict(meta, romfs=str(romfs), aoc=str(aoc or ''), zip_store=g.get('zip_store') or '', ipa=str(nsp_dir / g.get('ipa')), work=str(work))
+    ipa_local_ok = not big_ok or B.free_gb(work) >= 24   # nxkit-d3: the IPA (~19 GB for Diablo III) spills to the share too
+    info = dict(meta, romfs=str(romfs), aoc=str(aoc or ''), zip_store=g.get('zip_store') or '', ipa=str((big if not ipa_local_ok else nsp_dir) / g.get('ipa')), work=str(work))
     (work / 'nxkit.json').write_text(json.dumps(info, indent=1))
     B.PROG.close()
     return info
