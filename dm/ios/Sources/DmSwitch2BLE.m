@@ -815,7 +815,7 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
         if (_central.isScanning) [_central stopScan];
         return;
     }
-    NSArray<CBUUID *> *filter = (_scanAlt & 1) ? @[[CBUUID UUIDWithString:DS2_UUID_SERVICE]] : nil;
+    NSArray<CBUUID *> *filter = (_scanAlt & 1) ? @[[CBUUID UUIDWithString:@DS2_UUID_SERVICE]] : nil;
     if (_central.isScanning) {
         if (_scanMode == filter) return;                 // same mode already running
         [_central stopScan];                             // mode flipped: restart with the new filter
