@@ -782,10 +782,17 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
 - (void)start {
     if (_started) return;
     _started = YES;
-    // BARE probe (env DM_SW2_BARE=1, set in the app's Documents/env.txt): a plain manager on the main
-    // queue with no wrapper machinery. If this still receives zero advertisements while nRF sees the pad,
-    // the starvation is system-level (new-SDK privacy model); if it sees them, our wrapper is the problem.
-    if (getenv("DM_SW2_BARE")) {
+    // BARE probe (the launcher's BLE toggle stores launcher.DM_SW2_BARE in the defaults; an env
+    // DM_SW2_BARE=1 also works): a plain manager on the main queue with no wrapper machinery. It is read
+    // here directly because the launcher only sets the environment at Play, while this scan starts with the
+    // launcher screen. If this still receives zero advertisements while nRF sees the pad, the starvation is
+    // system-level (new-SDK privacy model); if it sees them, our wrapper is the problem.
+    BOOL bare = getenv("DM_SW2_BARE") && *getenv("DM_SW2_BARE") && strcmp(getenv("DM_SW2_BARE"), "0") != 0;
+    if (!bare) {
+        NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"launcher.DM_SW2_BARE"];
+        bare = saved && ![saved isEqualToString:@"0"];
+    }
+    if (bare) {
         LOG("switch2: BARE probe: plain CBCentralManager on the main queue (queue:nil), wrapper bypassed");
         _central = [[CBCentralManager alloc] initWithDelegate:self queue:nil options:@{CBCentralManagerOptionShowPowerAlertKey: @YES}];
         return;
