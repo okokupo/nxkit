@@ -18,7 +18,7 @@ import argparse, getpass, json, os, re, secrets, shutil, struct, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-NXNATIVE_REF = '624e9f4836c82905a60de513316af0ab2d5036f9'   # d3-all local branch: derron D3 (02f88445) + guest-file (bf28ad41) + Switch2 Pro (624e9f48); cloud fetches same tree as orphan 07473ab8 on okokupo/nxkit branch nxn-d3-combined
+NXNATIVE_REF = os.environ.get('NXNATIVE_REF', 'bbb8b7acfe47ffcca7bf392c3e21291235674b68')   # nxkit-d3: d3-main-merge2 (tree 382c35ef4afe15) = D3+guest-file+switch2+diagnostics merged with upstream main 976fbd5 (cloud fetches same tree as orphan a0a6e08 on okokupo/nxkit branch nxn-d3-main); NXNATIVE_REPO points checkout at /root/nxkit-home/nxnative-d3
 CONFIG = HERE / 'nxkit.local.json'     # home folder, repository and kit password (never committed: see .gitignore)
 APP = 'Payload/DmIOS.app/'             # the app folder inside the IPA (dm/ios/tools/build_ipa.sh)
 SYSDATA = APP + 'dm/sysdata/'          # system data archives from the player's own firmware (nxkit.py sysdata; the host's hle_fs.c mounts them, patch 0023)
@@ -77,8 +77,11 @@ def gh(*args, capture=False):
 def checkout(home, ref=None):
     """The nxnative checkout under home, at ref (default: NXNATIVE_REF; main: the newest main); returns (repo path, commit)"""
     repo = Path(home) / 'nxnative'
-    # The files exactly as on the Mac (no CRLF line endings, which Git for Windows writes by default): nxnative hashes its own sources (the shader chain version, build_src.sha256)
-    if not (repo / '.git').is_dir(): run(['git', 'clone', '-q', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'https://github.com/seedds/nxnative.git', repo])
+    url = os.environ.get('NXNATIVE_REPO', 'https://github.com/seedds/nxnative.git')   # nxkit-d3: a merged tree lives as orphan commits on okokupo/nxkit branches (nxn-d3-main)
+    if not (repo / '.git').is_dir(): run(['git', 'clone', '-q', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', url, repo])
+    else:
+        cur = run(['git', '-C', repo, 'remote', 'get-url', 'origin'], capture_output=True, text=True).stdout.strip()
+        if cur != url: run(['git', '-C', repo, 'remote', 'set-url', 'origin', url])   # nxkit-d3: switching between seedds and a local/merged-tree source
     run(['git', '-C', repo, 'config', 'core.autocrlf', 'false']); run(['git', '-C', repo, 'config', 'core.eol', 'lf'])
     run(['git', '-C', repo, 'fetch', '-q', 'origin'])
     ref = ref or NXNATIVE_REF
@@ -176,12 +179,14 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     env = dict(os.environ); env.setdefault('USER', getpass.getuser()); env.setdefault('J', str(os.cpu_count() or 8))
     py = sys.executable
 
-    dump = B.dump_folder(nsp_dir)   # nxkit-jamboree: a dump folder (extracted game files) instead of NSPs; old-base equivalent of pack_dump.is_dump + files_with_suffix
+    dump = B.pack_dump.is_dump(nsp_dir) and not B.files_with_suffix(nsp_dir, *B.PACKAGE_SUFFIXES)   # a dump folder (extracted game files) instead of NSPs
     if dump:
         app, fam = B.scan_dump(nsp_dir)
         B.say(f'a dump folder: {app:016X}, {len(fam["updates"])} update(s), {len(fam["dlc"])} DLC')
     else:
-        app, fam = B.scan_nsps(nsp_dir)   # old base: no package reader context; keys are validated by nx_extract itself
+        with B.package_reader(repo, keys, env) as packages:
+            app, fam = B.scan_nsps(nsp_dir, packages.contents)
+            packages.check_keys(fam)
     if not dump:
         nsp_local = Path(os.environ['NXKIT_NSP_LOCAL']) if os.environ.get('NXKIT_NSP_LOCAL') else kit_zip   # nxkit-d3: decompressed NSPs land on local disk (the SMB share is too slow to write back), rolling-deleted after their extract stages; NXKIT_NSP_LOCAL reuses a previous run's NSPs across restarts
     fam = B.decompress_nsz(nsp_dir, app, fam, keys, env, work=nsp_local)
@@ -203,7 +208,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     B.say(f'game profile: {g.id} ({g.get("name", "")}){" (provisional: " + str(g.dir) + ")" if provisional else ""}')
     apply_patches(repo, g.id)   # the game's own patches (patches/<title ID>): its code patches and split fixes are needed from the rewrite on
     builds, need = g.builds(), g.words('shader_versions')
-    have, derived = B.nsp_versions(fam, builds), False   # nxkit-d3: the old base needs the profile's registered builds
+    have, derived = B.nsp_versions(fam), False
     pkg_ver = package or (g.get('package') if provisional else max(have, key=B.vnum))
     if pkg_ver not in have: raise KitError(f'version {pkg_ver} is not in the folder, which holds {", ".join(sorted(have, key=B.vnum))}')
     if provisional: derived = 'provisional'   # downstream it is handled like a derived profile: its own shader tables, copied into the kit
@@ -293,7 +298,8 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
     for n in ('control.nacp',):
         if (game / n).exists(): shutil.copyfile(game / n, kit / 'game' / n)
     if icon: shutil.copyfile(icon, kit / 'game/icon.jpg')
-    romfs = game / 'RomFS'
+    romfs = game / 'RomFS.img'
+    if not romfs.is_file(): romfs = game / 'RomFS'   # the extract packs an image on this tree too; the info must name what actually exists (2026-11-09: a hardcoded RomFS dir name made merge silently drop the game)
     keep = []
     if gfx == 'vulkan':
         import vk_shaders
@@ -431,6 +437,8 @@ def merge(slim, romfs, aoc, store, out, sysdata=None):
     a zip_store suffix stored, everything else deflated at level 6"""
     store = tuple(s.lower() for s in (store or '').split(':') if s)
     out = Path(out); tmp = out.with_name(out.name + '.partial')
+    for label, p in (('romfs', romfs), ('aoc', aoc)):   # 2026-11-09: a missing input used to be skipped silently (os.walk yields nothing), shipping an IPA without the game (D3 lost its 16 GB RomFS this way)
+        if p and not Path(p).exists(): raise KitError(f'{label} input missing: {p} (stale path in nxkit.json?)')
     total = sum(p.stat().st_size for root in (romfs, aoc) if root and Path(root).is_dir() for p in Path(root).rglob('*') if p.is_file()) + (Path(romfs).stat().st_size if romfs and Path(romfs).is_file() else 0)
     done, t0, shown = 0, time.time(), 0
 
