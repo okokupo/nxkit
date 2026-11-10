@@ -16,7 +16,7 @@ typedef struct {
     bool connected;
 } dm_switch2_controller_info;
 
-void dm_switch2_start(void);
+void dm_switch2_ble_start(void);   // kit-d3: renamed from dm_switch2_start to stay clear of upstream's pad_switch2_apple.m (its dm_switch2_start(const dm_switch2_front*) is linked into iOS by gen_build and dead-strips unused)
 void dm_switch2_scan_start(void);
 void dm_switch2_scan_stop(void);
 bool dm_switch2_is_scanning(void);

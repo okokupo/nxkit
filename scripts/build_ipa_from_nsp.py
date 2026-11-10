@@ -609,7 +609,16 @@ def decompress_nsz(nsp_dir, app, fam, keys, env, work=None):
     and the file is moved into nsp/ only when nsz exits 0, so a partial one is never taken for a whole one; a conversion is reused while its source has the same name, size and
     modification time. nsz -D prints an NCA hash mismatch but goes on and exits 0: nx_extract's hash check catches a damaged file (ALLOW_DAMAGED)"""
     paths = [fam['base']] + [p for _, p in fam['updates']] + [p for _, _, p in fam['dlc']]
-    todo = list(dict.fromkeys(p for p in paths if p.suffix.lower() in COMPRESSED))   # a merged package is the base game, the update and DLC: converted once
+    # nxkit-d3 local (uncommitted): NXKIT_EXTRACT_READY="1441792,0" — versions whose extract tree already exists locally; their base/update NSPs are never read (the extract stage reuses the tree), so skip their conversion (a 14 GB base NSP would not fit the local drive beside a 17 GB RomFS.img). DLCs always convert (extract_aoc reads them)
+    ready = set()
+    for v in os.environ.get('NXKIT_EXTRACT_READY', '').split(','):  
+        if v.strip(): ready.add(vnum(v.strip()) if v.strip().startswith('v') else int(v.strip()))
+    def _pkg_version(p):
+        if p == fam['base']: return fam.get('base_version', 0)
+        for v, up in fam['updates']:
+            if p == up: return v
+        return None
+    todo = list(dict.fromkeys(p for p in paths if p.suffix.lower() in COMPRESSED and _pkg_version(p) not in ready))   # a merged package is the base game, the update and DLC: converted once
     if not todo: return fam
     nsz, keys_opt = nsz_command(env), []
     if nsz[0] != sys.executable: keys_opt = ['--keys', keys.resolve()]   # a standalone nsz looks for keys beside itself, not in cwd: it takes them by --keys (nsz_command)
@@ -625,7 +634,7 @@ def decompress_nsz(nsp_dir, app, fam, keys, env, work=None):
             log = logs / f'nsz_{p.stem}.log'
             try:
                 # nsz 4.6.1 loads keys.txt beside argv[0] at import time; with argv[0] = 'nsz' that is cwd. That release has no --keys option.
-                (tmp / 'keys.txt').symlink_to(keys.resolve())
+                shutil.copyfile(keys.resolve(), tmp / 'keys.txt')   # nxkit-d3 linux: an SMB-share tmp cannot symlink (Errno 5); a copy serves nsz's cwd keys.txt the same
                 run([*nsz, *keys_opt, '-D', '-o', tmp, nsz_source(p, tmp)], log, env=env, cwd=tmp)
                 if not (tmp / dst.name).is_file(): raise BuildError(f'nsz made no {dst.name} (full output: {log})')
                 (tmp / dst.name).rename(dst)

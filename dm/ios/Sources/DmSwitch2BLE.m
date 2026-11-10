@@ -1015,7 +1015,7 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
 
 @end
 
-void dm_switch2_start(void) {
+void dm_switch2_ble_start(void) {
     @autoreleasepool { [[DmSwitch2BLE shared] start]; }
 }
 
