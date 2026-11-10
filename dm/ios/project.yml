@@ -47,6 +47,8 @@ targets:
         UIViewControllerBasedStatusBarAppearance: false
         NSBluetoothAlwaysUsageDescription: "A Nintendo Switch 2 Pro Controller connects over Bluetooth so games can use it; iOS has no built-in support for this controller."
         NSBluetoothPeripheralUsageDescription: "A Nintendo Switch 2 Pro Controller connects over Bluetooth so games can use it; iOS has no built-in support for this controller."
+        UIBackgroundModes:                  # bluetooth-central: iOS 26 delivers general-issue (blank) BLE scan results only to apps declaring it (nRF-style apps all do; without it a foreground scan silently receives nothing)
+          - bluetooth-central
         LSApplicationCategoryType: ${DM_APP_CATEGORY}   # game profile app_category
         DMShowFPS: ${DM_SHOW_FPS}           # YES = the frame-rate counter is on (front_ios.m; set by build_ipa.sh)
         DMLanguage: ${DM_LANG}              # the game language code (main.m sets DM_LANG from it; set by build_ipa.sh)
