@@ -790,10 +790,10 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
     [nc addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil usingBlock:^(NSNotification *n) {
         (void)n; dispatch_async(self->_q, ^{ if (self->_central.isScanning) [self->_central stopScan]; });
     }];
-    // Diagnostic heartbeat: every 8 s flip the scan mode and refresh the scan, every third beat log the state.
-    // Rationale: a blank scan (services nil) delivers nothing to a client iOS treats as background, and a
-    // LiveContainer-hosted game may be classified that way even while its UI is front. The service-filtered
-    // mode works in that case; the log line proves which mode sees the pad.
+    // Heartbeat: every 8 s re-evaluate the scan, every third beat log the state. The scan itself is
+    // continuous and unfiltered: every mature Switch 2 host (meleepad, procon2-mac, InputConfig) scans
+    // withServices:nil because the pad's advertisement carries no service UUID, so a filtered scan can
+    // never see it; rapid stop/scan cycling also risks iOS's silent scan throttling.
     _scanTick = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _q);
     dispatch_source_set_timer(_scanTick, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), (int64_t)(8.0 * NSEC_PER_SEC), 0);
     dispatch_source_set_event_handler(_scanTick, ^{
@@ -815,10 +815,10 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
         if (_central.isScanning) [_central stopScan];
         return;
     }
-    NSArray<CBUUID *> *filter = (_scanAlt & 1) ? @[[CBUUID UUIDWithString:@DS2_UUID_SERVICE]] : nil;
+    NSArray<CBUUID *> *filter = nil;                 // always unfiltered: the pad advertises no service UUID
     if (_central.isScanning) {
-        if (_scanMode == filter) return;                 // same mode already running
-        [_central stopScan];                             // mode flipped: restart with the new filter
+        if (_scanMode == filter) return;             // already scanning unfiltered: keep it continuous
+        [_central stopScan];
     }
     _scanMode = filter;
     // Allow duplicates: the alternating restarts defeat iOS's cross-scan dedup cache, so a peripheral already
@@ -831,7 +831,7 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central {
     switch (central.state) {
         case CBManagerStatePoweredOn: {
-            LOG("switch2: Bluetooth ready");
+            LOG("switch2: Bluetooth ready (app state %ld: 0=active 1=inactive 2=background)", (long)[UIApplication sharedApplication].applicationState);
             [self updateScanning];
             __weak DmSwitch2BLE *weak = self;
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(20.0 * NSEC_PER_SEC)), _q, ^{
