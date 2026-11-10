@@ -757,6 +757,9 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
     NSMutableArray<DS2Pad *> *_pads;
     NSMutableDictionary<NSUUID *, DmSwitch2Session *> *_connecting;
     BOOL _started;
+    int _scanAlt;                                        // alternates the two scan modes below (diagnostic)
+    NSArray<CBUUID *> *_scanMode;                        // the filter the running scan was started with
+    dispatch_source_t _scanTick;                         // 8 s heartbeat: flips the mode, logs the scan state
 }
 
 + (instancetype)shared {
@@ -787,19 +790,42 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
     [nc addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil usingBlock:^(NSNotification *n) {
         (void)n; dispatch_async(self->_q, ^{ if (self->_central.isScanning) [self->_central stopScan]; });
     }];
+    // Diagnostic heartbeat: every 8 s flip the scan mode and refresh the scan, every third beat log the state.
+    // Rationale: a blank scan (services nil) delivers nothing to a client iOS treats as background, and a
+    // LiveContainer-hosted game may be classified that way even while its UI is front. The service-filtered
+    // mode works in that case; the log line proves which mode sees the pad.
+    _scanTick = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _q);
+    dispatch_source_set_timer(_scanTick, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), (int64_t)(8.0 * NSEC_PER_SEC), 0);
+    dispatch_source_set_event_handler(_scanTick, ^{
+        self->_scanAlt++;
+        if (self->_scanAlt % 3 == 1)
+            LOG("switch2: heartbeat scan=%s mode=%s pads=%lu connecting=%lu",
+                self->_central.isScanning ? "active" : "idle",
+                self->_scanMode ? "service" : "blank",
+                (unsigned long)self->_pads.count, (unsigned long)self->_connecting.count);
+        [self updateScanning];
+    });
+    dispatch_resume(_scanTick);
 }
 
 - (void)updateScanning {
     if (_central.state != CBManagerStatePoweredOn) return;
     NSUInteger busy = _pads.count + _connecting.count;   // a grip's two halves share one pad, so count pads, not sessions
-    if (busy < DM_PLAYERS) {
-        if (!_central.isScanning) {
-            [_central scanForPeripheralsWithServices:nil options:@{CBCentralManagerScanOptionAllowDuplicatesKey: @NO}];
-            LOG("switch2: scanning for a Switch 2 Pro Controller (hold Sync until the player LEDs sweep; if iOS Settings holds it, forget it there first)");
-        }
-    } else if (_central.isScanning) {
-        [_central stopScan];
+    if (busy >= DM_PLAYERS) {
+        if (_central.isScanning) [_central stopScan];
+        return;
     }
+    NSArray<CBUUID *> *filter = (_scanAlt & 1) ? @[[CBUUID UUIDWithString:DS2_UUID_SERVICE]] : nil;
+    if (_central.isScanning) {
+        if (_scanMode == filter) return;                 // same mode already running
+        [_central stopScan];                             // mode flipped: restart with the new filter
+    }
+    _scanMode = filter;
+    // Allow duplicates: the alternating restarts defeat iOS's cross-scan dedup cache, so a peripheral already
+    // delivered once in an earlier scan is still delivered again — what we want while pairing.
+    [_central scanForPeripheralsWithServices:filter options:@{CBCentralManagerScanOptionAllowDuplicatesKey: @YES}];
+    LOG("switch2: scanning (%s) for a Switch 2 Pro Controller (hold Sync until the player LEDs sweep; if iOS Settings holds it, forget it there first)",
+        filter ? "service-filtered" : "blank");
 }
 
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central {
@@ -824,11 +850,19 @@ static void ds2_rumble_dispatch(const dm_haptic_state *s) {
 
 - (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)p advertisementData:(NSDictionary<NSString *, id> *)adv rssi:(NSNumber *)rssi {
     NSData *manu = adv[CBAdvertisementDataManufacturerDataKey];
+    // Diagnostic: log every discovery before any filtering. iOS strips fields (manufacturer data above all)
+    // from clients it treats as background; seeing what actually arrives decides between the theories.
+    NSArray<CBUUID *> *svcs = adv[CBAdvertisementDataServiceUUIDsKey] ?: @[];
+    LOG("switch2: adv seen %s rssi=%d manu=%lu%s services=%s",
+        (p.name ?: @"(no name)").UTF8String, rssi.intValue,
+        (unsigned long)(manu ? manu.length : 0),
+        (manu ? "" : " (stripped)"),
+        svcs.count ? [svcs description].UTF8String : "none");
     if (!manu || manu.length < 18) return;
     const uint8_t *b = manu.bytes;
-    if (ds2_u16(b) != DS2_COMPANY_ID) return;
+    if (ds2_u16(b) != DS2_COMPANY_ID) { LOG("switch2: adv company %04x rejected", ds2_u16(b)); return; }
     ds2_advert a;
-    if (!ds2_advert_parse(b + 2, manu.length - 2, &a)) return;
+    if (!ds2_advert_parse(b + 2, manu.length - 2, &a)) { LOG("switch2: adv company %04x failed the Switch 2 parse (len %lu)", ds2_u16(b), (unsigned long)manu.length); return; }
     if (_connecting[p.identifier] || _sessions[p.identifier]) return;
     if (_sessions.count + _connecting.count >= DM_PLAYERS) return;
     LOG("switch2: found %s rssi=%d%s", (p.name ?: @"a Switch 2 controller").UTF8String, rssi.intValue,
