@@ -62,26 +62,24 @@ int main(void) { @autoreleasepool {
     CHECK(P(nvnQueueInitialize)(&queues[0],&fresh),"queue storage can be initialized again");
     mtl_queue_activate(((queue_t *)&queues[0])->serial);
     CHECK(((queue_t *)&queues[0])->serial != first_serial && !S.bst[0] && !S.prog && !R.has_sc,"reinitializing a queue never inherits finalized program pointers");
-    // No draw consumes the intermediate vertex-new / fragment-old state. Protect
-    // the retired program's page so even looking at its serial fails this test.
-    size_t page = (size_t)getpagesize();
-    prog_t *retired = mmap(NULL,page,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
-    CHECK(retired != MAP_FAILED,"retired program storage allocated");
-    if (retired == MAP_FAILED) return 1;
-    *retired = pg; retired->serial = 920003; serial_put(retired->serial,program);
-    S.bst[0] = S.bst[1] = S.prog = retired;
+    // A program finalized while queues still have it bound (Fortune's Weave's title screen to opening demo): it leaves the active queue's bindings and every saved
+    // queue state, so switching back to a queue never combines stages from its reused memory
+    NVNprogram bound; P(nvnProgramInitialize)(&bound,&device);
+    const prog_t *bp = (const prog_t *)&bound;
+    mtl_queue_activate(((queue_t *)&queues[1])->serial); S.bst[0] = S.bst[1] = S.prog = bp;
+    mtl_queue_activate(((queue_t *)&queues[0])->serial); S.bst[0] = S.prog = bp;
+    P(nvnProgramFinalize)(&bound);
+    CHECK(!S.bst[0] && !S.prog,"finalizing a program unbinds it from the active queue");
+    memset(&bound,0xa5,sizeof bound);
     mtl_queue_activate(((queue_t *)&queues[1])->serial);
-    P(nvnProgramFinalize)((NVNprogram *)retired);
-    CHECK(!mprotect(retired,page,PROT_NONE),"finalized program made unreadable");
-    mtl_queue_activate(((queue_t *)&queues[0])->serial);
-    p_bind_program vertex = {.prog=&pg,.stages=1}, fragment = {.prog=&pg,.stages=2};
-    state_op(OP_BIND_PROGRAM,&vertex); state_op(OP_BIND_PROGRAM,&fragment);
-    prog_resolve();
-    CHECK(S.prog == &pg,"separate stage replacements resolve only after both binds");
-    fragment.prog = NULL; state_op(OP_BIND_PROGRAM,&fragment); prog_resolve();
-    NvProg *depth_only = S.prog ? prog_get(S.prog) : nil;
-    CHECK(depth_only && depth_only->sh[0] == vs && !depth_only->sh[1],"fragment unbinding keeps the vertex stage");
-    munmap(retired,page); state_reset(); memset(&R,0,sizeof R);
+    CHECK(!S.bst[0] && !S.bst[1] && !S.prog,"finalizing a program unbinds it from a saved queue state");
+    // Stages bound from two programs make a composite: finalizing the fragment program takes the effective program again, the vertex stage alone
+    static prog_t pf = {.serial=920003}; NvProg *fprogram = [NvProg new]; fprogram->sh[1] = fs; serial_put(pf.serial,fprogram);
+    S.prog = bind_stages(&pg,1); S.prog = bind_stages(&pf,2);   // NOLINT(clang-analyzer-osx.cocoa.RetainCount): g_by_serial owns fprogram (serial_put's CFBridgingRetain), not a leak
+    CHECK(S.prog && S.prog != &pg && prog_get(S.prog)->sh[0] == vs && prog_get(S.prog)->sh[1] == fs,"a vertex and a fragment program bound apart make a composite");   // NOLINT(clang-analyzer-osx.cocoa.RetainCount): g_by_serial owns the composite bind_stages made (serial_put's CFBridgingRetain), not a leak
+    P(nvnProgramFinalize)((NVNprogram *)&pf);
+    CHECK(!S.bst[1] && S.prog && prog_get(S.prog)->sh[0] == vs && !prog_get(S.prog)->sh[1],"finalizing a composite's fragment program drops its stage from the effective program");
+    memset(S.bst,0,sizeof S.bst); S.prog = NULL;
     // Native GPU state: matching queue/device origins keep NVN's NDC facing;
     // differing origins reverse it. CW and CCW expectations are explicit here.
     const int front_in_clip[2][2][2] = {{{0,1},{1,0}},{{1,0},{0,1}}};

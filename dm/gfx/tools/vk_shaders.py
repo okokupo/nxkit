@@ -147,12 +147,15 @@ def metallib(msls, out, sdk, extra):
     airs = []
     def comp(m):
         a = m[:-6] + f'.{sdk}.air'
-        r = subprocess.run(['xcrun', '-sdk', sdk, 'metal', '-c', '-fpreserve-invariance', *extra, m, '-o', a], capture_output=True, text=True)
+        # -fwrapv: signed integer overflow wraps, as SPIR-V's integer arithmetic does; in MSL it is undefined and the compiler folds around it (dmsh_build.py MAC_METAL)
+        r = subprocess.run(['xcrun', '-sdk', sdk, 'metal', '-c', '-fpreserve-invariance', '-fwrapv', *extra, m, '-o', a], capture_output=True, text=True)
         if r.returncode: red(f'{m}: metal compile failed: {r.stderr.strip()[:400]}')
         return a
     with cf.ThreadPoolExecutor(os.cpu_count()) as ex: airs = list(ex.map(comp, msls))
     lib = os.path.join(out, 'vk_shaders.metallib')
-    subprocess.run(['xcrun', '-sdk', sdk, 'metallib', *airs, '-o', lib], check=True)
+    # relative to their common folder: thousands of absolute paths under a long work folder pass ARG_MAX (1 MB on macOS) and xcrun fails with E2BIG
+    base = os.path.commonpath([os.path.dirname(x) for x in airs])
+    subprocess.run(['xcrun', '-sdk', sdk, 'metallib', *[os.path.relpath(x, base) for x in airs], '-o', os.path.abspath(lib)], check=True, cwd=base)
     return lib
 
 def main():
