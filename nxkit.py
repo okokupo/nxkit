@@ -236,7 +236,7 @@ def prepare(repo, commit, nsp_dir, keys, kit_zip, package=None, app_name=None, l
 
     B.PROG.plan(5 + len(versions))
     B.PROG.stage('build nx_extract')
-    nx = B.build_nx_extract(repo, work, logs, env)
+    nx = B.find_nx_extract(repo, env)   # nxkit-d3: the Route B tree ships nx_extract as a committed native binary (no .NET build; find_nx_extract verifies its --source-sha against the in-repo sources)
     B.PROG.end()
     dirs = {}
     for v in versions:
@@ -498,6 +498,13 @@ LAUNCHER_ZH = {
     'Game': '游戏', 'Controls': '控制', 'Performance': '性能',
     # 设置项名（dm/games/settings.tsv label 列）
     'Frame rate': '帧率', 'Dynamic resolution': '动态分辨率', 'Render scale': '渲染比例',
+    "Game's upscaler": "游戏自带升频",
+    '30 fps': '30 帧', '60 fps': '60 帧', '120 fps': '120 帧', 'None': '无', 'MetalFX': 'MetalFX（苹果升频）',
+    'A (Jump / Confirm)': 'A（跳跃 / 确认）', 'B (Sprint / Cancel)': 'B（冲刺 / 取消）',
+    'Left stick click (L3)': '左摇杆按下（L3）', 'Right stick click (R3)': '右摇杆按下（R3）',
+    'ZL trigger': 'ZL 扳机', 'ZR trigger': 'ZR 扳机', 'X': 'X 键', 'Y': 'Y 锁', 'Left back button': '背部左键', 'Right back button': '背部右键',
+    'Switch 2 deadzone': 'Switch 2 摇杆死区', 'Switch 2 motion': 'Switch 2 体感', 'Switch 2 rumble': 'Switch 2 震动',
+    'GameCube trigger': 'GameCube 扳机', 'Switch 2 controllers': 'Switch 2 手柄',
     'Console mode': '主机模式', 'Upscaling': '画质增强', "Game's upscaler": '游戏自带增强',
     'Game language': '游戏语言', 'Display mode': '显示模式', 'Picture': '画面适配',
     'Frame-rate counter': '帧率显示', 'Touch feedback': '触摸反馈', 'Game rumble': '手柄震动',
