@@ -525,6 +525,16 @@ static void s2_rumble_timer(void) {
     }];
 }
 
+// The in-game menu changed a paddle slot: put the new value back into the environment and re-log the mapping (s2_buttons reads the env at every report, so nothing else to refresh)
+void dm_switch2_paddle_live(const char *env, const char *value) {
+    static const char *const slots[6] = {"DM_SW2_GL_1", "DM_SW2_GL_2", "DM_SW2_GL_3", "DM_SW2_GR_1", "DM_SW2_GR_2", "DM_SW2_GR_3"};
+    for (int i = 0; i < 6; i++) if (!strcmp(env, slots[i])) {
+        setenv(env, value ? value : "-", 1);
+        LOG("[sw2] %s = %s (in-game menu)", env, value && *value != '-' ? value : "off");
+        return;
+    }
+}
+
 int dm_switch2_start(const dm_switch2_front *front) {
     const char *e = getenv("DM_SW2"); if (!e || !atoi(e)) return 0;   // off by default: no Bluetooth client, so no permission prompt
     if (![NSBundle.mainBundle objectForInfoDictionaryKey:@"NSBluetoothAlwaysUsageDescription"]) {

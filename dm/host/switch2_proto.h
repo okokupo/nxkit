@@ -155,6 +155,19 @@ static const uint8_t s2_led_pattern[8] = {0x01, 0x03, 0x07, 0x0F, 0x09, 0x05, 0x
 typedef struct { int have; uint16_t pid; s2_report r; s2_cal cal[2]; } s2_dev;   // cal[0]: the first stick slot (a Joy-Con's only stick), cal[1]: the second (Pro Controller 2's right stick)
 typedef struct { s2_dev pro, left, right; } s2_pad_state;                       // a Pro Controller 2 in pro, or Joy-Con 2s in left / right
 
+// One back paddle's slots (DM_SW2_GL_1/2/3, DM_SW2_GR_1/2/3): a paddle presses all its mapped buttons at once, so any combination is assignable.
+static inline uint64_t s2_paddle(const char *env) {
+    const char *e = getenv(env); if (!e || *e == '-') return 0;
+    uint64_t m = 0;
+    for (const char *s = e; *s; ) {
+        char *end; long v = strtol(s, &end, 10);   // keys are 1..15, the NpadButton bit order
+        if (end == s || v < 1 || v > 15) break;
+        m |= 1ull << (v - 1);
+        s = *end == '+' ? end + 1 : end;
+    }
+    return m;
+}
+
 // A device's own buttons as NpadButtons. A Joy-Con held on its own (alone: 1) is used sideways, so its rail buttons are the shoulder buttons and its stick the left stick.
 static inline uint64_t s2_buttons(uint32_t b, int joycon, int alone) {
     uint64_t m = 0;
@@ -166,6 +179,8 @@ static inline uint64_t s2_buttons(uint32_t b, int joycon, int alone) {
         if (b & (S2_SL_L | S2_SL_R)) m |= DM_BTN_L;
         if (b & (S2_SR_L | S2_SR_R)) m |= DM_BTN_R;
     }
+    if (b & S2_GL) m |= s2_paddle("DM_SW2_GL");   // the back paddles: hardware reports them, the console maps them; we offer free mapping
+    if (b & S2_GR) m |= s2_paddle("DM_SW2_GR");
     return m;
 }
 

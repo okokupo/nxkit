@@ -288,6 +288,7 @@ bool dm_setting_live(const char *env, const char *value) {
     if (!strcmp(env, "DM_SHOW_FPS")) { if (value) [g_root showFPS:atoi(value) != 0]; return true; }
     if (!strcmp(env, "DM_TOUCH_HAPTICS")) { if (value) dm_gamepad_touch_feedback(atoi(value) != 0); return true; }
     if (!strcmp(env, "DM_RUMBLE")) { if (value) { dm_haptics_set_enabled(atoi(value) != 0); LOG("front end: game rumble %s (in-game menu)", atoi(value) ? "on" : "off"); } return true; }
+    if (!strncmp(env, "DM_SW2_GL_", 9) || !strncmp(env, "DM_SW2_GR_", 9)) { if (value) dm_switch2_paddle_live(env, value); return true; }   // the Switch 2 back paddles (the NULL query only lists them)
     return false;
 }
 @interface DmTVSceneDelegate : UIResponder <UIWindowSceneDelegate>

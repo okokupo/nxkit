@@ -36,6 +36,12 @@ DM_RUMBLE_GAIN	range	0:3:0.1	1.0	always	Controls	Rumble strength		needs=DM_RUMBL
 DM_RUMBLE_MIN	range	0:0.9:0.05	0	always	Controls	Rumble cutoff
 DM_PAD_PRESS_TO_JOIN	toggle	-	0	always	Controls	Press a button to join
 DM_SW2	toggle	-	0	always	Controls	Switch 2 controllers	Plays Joy-Con 2 and Pro Controller 2 over Bluetooth: hold Sync on one during the game to pair it (on iPhone and iPad, after each start). The system asks once for Bluetooth access.
+DM_SW2_GL_1	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Left back button 1	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
+DM_SW2_GL_2	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Left back button 2	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
+DM_SW2_GL_3	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Left back button 3	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
+DM_SW2_GR_1	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Right back button 1	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
+DM_SW2_GR_2	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Right back button 2	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
+DM_SW2_GR_3	choice	-=Off,A=A,B=B,X=X,Y=Y,ZL=ZL,ZR=ZR,PLUS=Plus,MINUS=Minus,LS=Left stick,RS=Right stick	-	always	Controls	Right back button 3	Maps a back paddle of a Switch 2 Pro Controller to this button; a paddle presses all its non-off slots at once.	level=basic
 DM_SCREEN_ASPECT	choice	auto=Match screen?platform:ios,1.43=iPhone Duo screen (1.43:1),0=16:9 (Switch)	auto|0	DM_GAME_SCREEN_ASPECT!=0	Game	Picture shape	Renders about a quarter more pixels: a little slower and warmer.
 DM_PRESENT_SNAP	toggle	-	DM_GAME_PRESENT_SNAP	gfxapi:nvn	Performance	Frame buffering	Up to one frame more display latency.
 DM_PSO_MTL4	toggle	-	DM_GAME_PSO_MTL4|1	gfxapi:nvn	Performance	Metal 4 pipelines	Keeps a pipeline archive; uses more memory.
