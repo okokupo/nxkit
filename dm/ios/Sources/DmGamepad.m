@@ -634,7 +634,6 @@ static void pads_start(void) {
     const char *e = getenv("DM_PAD_MERGE"); g_merge = e && atoi(e);
     e = getenv("DM_PAD_PRESS_TO_JOIN"); g_press_to_join = !g_merge && e && atoi(e);
     LOG("front end: %s", g_merge ? "every controller is player 1 (DM_PAD_MERGE)" : "each controller is a player of its own, the touch gamepad plays with player 1");
-    dm_switch2_ble_start();   // Nintendo Switch 2 Pro Controller over CoreBluetooth: iOS has no system support for it (DmSwitch2BLE.m; renamed to stay clear of upstream pad_switch2_apple.m)
     if (g_press_to_join) LOG("front end: a controller becomes a player at its first button press, the lowest player free (DM_PAD_PRESS_TO_JOIN)");
     if (dm_switch2_start(&g_s2front)) LOG("front end: Switch 2 controllers: hold Sync on one to use it (no bonding on iOS: again after each start)");
 }
