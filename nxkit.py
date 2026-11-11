@@ -511,6 +511,8 @@ LAUNCHER_ZH = {
     'Rumble strength': '震动强度', 'Rumble cutoff': '震动截止', 'Press a button to join': '按键加入游戏',
     'Picture shape': '画面比例', 'Frame buffering': '帧缓冲', 'Metal 4 pipelines': 'Metal 4 管线',
     'Pipeline prebuild': '管线预构建', 'Encode thread': '编码线程', 'Hold frames when late': '落后时保持帧',
+    'Plays Joy-Con 2 and Pro Controller 2 over Bluetooth: hold Sync on one during the game to pair it (on iPhone and iPad, after each start). The system asks once for Bluetooth access.':
+        '通过蓝牙连接 Joy-Con 2 和 Pro 手柄 2：游戏内长按其中一个的 Sync 键配对（iPhone/iPad 每次启动后需重新配对）。系统会请求一次蓝牙权限。',
     'Performance HUD': '性能悬浮窗',
     # 选项名
     'Docked': '电视底座', 'Handheld': '掌机', 'Standard': '标准', "Game's own": '游戏自带',
