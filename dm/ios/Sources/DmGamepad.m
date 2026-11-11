@@ -22,7 +22,7 @@
 #include "dm.h"
 #include "dm_input.h"
 #include "front.h"
-#include "dm_switch2.h"
+#include "pad_switch2_apple.h"
 #include "game_profile.h"
 #include "haptics_apple.h"
 #include "motion_apple.h"
