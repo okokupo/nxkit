@@ -250,7 +250,7 @@ private struct Switch2TestView: View {
         return VStack(spacing: 4) {
             Circle().frame(width: 44, height: 44).foregroundStyle(.gray.opacity(0.15))
                 .overlay { Circle().frame(width: 16, height: 16).foregroundStyle(.blue).offset(x: cx, y: cy) }
-            Text("\(label) \(Int(x))·\(Int(y))").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            Text("\(label) \(Int(x))·\(Int(y))").font(.caption2.monospacedDigit()).foregroundStyle(.secondary).frame(width: 96)
         }
     }
 
