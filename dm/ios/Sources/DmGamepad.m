@@ -635,6 +635,14 @@ static void pads_start(void) {
     e = getenv("DM_PAD_PRESS_TO_JOIN"); g_press_to_join = !g_merge && e && atoi(e);
     LOG("front end: %s", g_merge ? "every controller is player 1 (DM_PAD_MERGE)" : "each controller is a player of its own, the touch gamepad plays with player 1");
     if (g_press_to_join) LOG("front end: a controller becomes a player at its first button press, the lowest player free (DM_PAD_PRESS_TO_JOIN)");
+    dm_switch2_ensure_started();
+}
+// Starts the Switch 2 BLE transport once (the launcher calls it at appear, so a pad is pairable before the game starts; pads_start reuses this at game time)
+void dm_switch2_ensure_started(void) {
+    static BOOL once = NO;
+    if (once) return; once = YES;
+    const char *e = getenv("DM_PAD_MERGE"); g_merge = e && atoi(e);
+    e = getenv("DM_PAD_PRESS_TO_JOIN"); g_press_to_join = !g_merge && e && atoi(e);
     if (dm_switch2_start(&g_s2front)) LOG("front end: Switch 2 controllers: hold Sync on one to use it (no bonding on iOS: again after each start)");
 }
 // Called at start and on every connect / disconnect (gone: the controller that was just removed, nil otherwise); returns whether a controller is in use

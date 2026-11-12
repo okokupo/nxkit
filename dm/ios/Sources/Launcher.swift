@@ -145,6 +145,7 @@ private struct LauncherView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { dm_switch2_ensure_started() }   // scanning runs from the launcher: a pad pairs before the game starts
         .task {
             while !Task.isCancelled {
                 memory = os_proc_available_memory()
@@ -237,6 +238,7 @@ private struct Switch2TestView: View {
         }
         .navigationTitle("手柄测试").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+        .onAppear { dm_switch2_ensure_started() }   // opened before the transport started: start it now
         .task {
             while !Task.isCancelled { tick += 1; try? await Task.sleep(for: .milliseconds(100)) }
         }

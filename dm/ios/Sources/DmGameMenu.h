@@ -12,6 +12,7 @@ bool dm_pad_layout_offered(int layout);   // Tap only in handheld mode
 void dm_pad_layout_set(int layout);   // releases every touch first, and is saved for the next start
 void dm_gamepad_touch_feedback(bool on);   // DM_TOUCH_HAPTICS
 bool dm_setting_live(const char *env, const char *value);   // front_ios.m: value NULL asks whether the running game takes env at once; otherwise applies it
+void dm_switch2_ensure_started(void);   // DmGamepad.m: starts the Switch 2 BLE transport once; the launcher calls it so a pad pairs before the game starts
 #ifdef __cplusplus
 }
 #endif
