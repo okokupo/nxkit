@@ -637,12 +637,19 @@ static void pads_start(void) {
     if (g_press_to_join) LOG("front end: a controller becomes a player at its first button press, the lowest player free (DM_PAD_PRESS_TO_JOIN)");
     dm_switch2_ensure_started();
 }
-// Starts the Switch 2 BLE transport once (the launcher calls it at appear, so a pad is pairable before the game starts; pads_start reuses this at game time)
+// Starts the Switch 2 BLE transport once (the launcher calls it at appear, so a pad is pairable before the game starts; pads_start reuses this at game time).
+// The toggle gate must come BEFORE latching: at launcher appear DM_SW2 is not setenv'd yet (apply runs at Play), so an unconditional latch here would dead-lock the game-time start.
 void dm_switch2_ensure_started(void) {
     static BOOL once = NO;
-    if (once) return; once = YES;
-    const char *e = getenv("DM_PAD_MERGE"); g_merge = e && atoi(e);
-    e = getenv("DM_PAD_PRESS_TO_JOIN"); g_press_to_join = !g_merge && e && atoi(e);
+    if (once) return;
+    const char *e = getenv("DM_SW2");
+    if (!e || !atoi(e)) {   // the launcher hasn't applied settings yet: fall back to the toggle's saved value (UserDefaults "launcher.DM_SW2", written on every change)
+        id v = [NSUserDefaults.standardUserDefaults objectForKey:@"launcher.DM_SW2"];
+        if (v && [v boolValue]) setenv("DM_SW2", "1", 1); else return;   // off (or unset): leave once unset so the game-time call can start it after the launcher applies
+    }
+    once = YES;
+    const char *m = getenv("DM_PAD_MERGE"); g_merge = m && atoi(m);
+    m = getenv("DM_PAD_PRESS_TO_JOIN"); g_press_to_join = !g_merge && m && atoi(m);
     if (dm_switch2_start(&g_s2front)) LOG("front end: Switch 2 controllers: hold Sync on one to use it (no bonding on iOS: again after each start)");
 }
 // Called at start and on every connect / disconnect (gone: the controller that was just removed, nil otherwise); returns whether a controller is in use
