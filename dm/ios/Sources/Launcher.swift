@@ -194,7 +194,7 @@ public func dmShowLauncher(_ viewController: UnsafeMutableRawPointer, _ done: @c
 }
 
 // ---- Switch 2 controller test view (Chen's request 2026-11-12): live button/stick echo without entering the game ----
-// Reads the shared transport's pad list directly (dm_switch2_pads, main-queue data): one card per pad, every
+// Reads the transport through the flat C snapshot (dm_switch2_test_rows): one card per pad, every
 // raw button bit highlighted while held, the back paddles GL/GR in their own row, sticks as raw counts.
 private struct Switch2TestView: View {
     @Environment(\.dismiss) private var dismiss
@@ -254,22 +254,22 @@ private struct Switch2TestView: View {
         }
     }
 
-    // One entry per pad: merged buttons across its controllers, Pro 2's sticks/battery preferred
+    // One row per pad via the C flat snapshot (dm_switch2_test_rows): Swift cannot touch the transport's structs directly
     private func pods() -> [(name: String, buttons: UInt32, lx: UInt16, ly: UInt16, rx: UInt16, ry: UInt16, battery: UInt16)] {
         guard tick >= 0 else { return [] }   // depend on tick so SwiftUI re-reads every poll
-        var out: [(String, UInt32, UInt16, UInt16, UInt16, UInt16, UInt16)] = []
-        var p = dm_switch2_pads()
-        while let pad = p {
-            let st = pad.pointee.st
-            var buttons: UInt32 = 0
-            for dev in [st.pro, st.left, st.right] where dev.have != 0 { buttons |= dev.r.buttons }
-            let src = st.pro.have != 0 ? st.pro : (st.left.have != 0 ? st.left : st.right)
-            let pid = src.pid
-            let name = pid == 0x2069 ? "Pro Controller 2" : pid == 0x2066 ? "Joy-Con 2 右" : pid == 0x2067 ? "Joy-Con 2 左" : pid == 0x2073 ? "NSO GameCube" : String(format: "0x%04x", pid)
-            out.append((name, buttons, src.r.lx, src.r.ly, src.r.rx, src.r.ry, src.r.battery_mv))
-            p = pad.pointee.next
+        var rows = (0..<8).map { _ in dm_s2_test_row(pid: 0, buttons: 0, lx: 0, ly: 0, rx: 0, ry: 0, battery_mv: 0) }
+        let n = dm_switch2_test_rows(&rows, Int32(rows.count))
+        return rows.prefix(Int(n)).map { r in (name(r.pid), r.buttons, r.lx, r.ly, r.rx, r.ry, r.battery_mv) }
+    }
+
+    private func name(_ pid: UInt32) -> String {
+        switch pid {
+        case 0x2069: return "Pro Controller 2"
+        case 0x2066: return "Joy-Con 2 右"
+        case 0x2067: return "Joy-Con 2 左"
+        case 0x2073: return "NSO GameCube"
+        default: return String(format: "0x%04x", pid)
         }
-        return out
     }
 }
 

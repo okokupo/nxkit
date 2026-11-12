@@ -13,6 +13,10 @@ void dm_pad_layout_set(int layout);   // releases every touch first, and is save
 void dm_gamepad_touch_feedback(bool on);   // DM_TOUCH_HAPTICS
 bool dm_setting_live(const char *env, const char *value);   // front_ios.m: value NULL asks whether the running game takes env at once; otherwise applies it
 void dm_switch2_ensure_started(void);   // DmGamepad.m: starts the Switch 2 BLE transport once; the launcher calls it so a pad pairs before the game starts
+
+// Switch 2 test view (Launcher.swift): a flat pad snapshot so Swift needs no C struct access
+typedef struct dm_s2_test_row { unsigned pid, buttons; unsigned short lx, ly, rx, ry, battery_mv; } dm_s2_test_row;
+int dm_switch2_test_rows(dm_s2_test_row *out, int cap);   // DmGamepad.m: fills up to cap rows, returns the pad count
 #ifdef __cplusplus
 }
 #endif

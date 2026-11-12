@@ -837,6 +837,19 @@ static void s2pad_detach(s2_pad *d) {   // d is already off the transport's list
 }
 static const dm_switch2_front g_s2front = {s2pad_attach, s2pad_detach, s2pad_read, s2pad_player, s2pad_blocked};
 
+// The test view's flat snapshot (Launcher.swift): one row per pad (buttons merged across its devices; the Pro 2's sticks preferred, else the first present)
+int dm_switch2_test_rows(dm_s2_test_row *out, int cap) {
+    int n = 0;
+    for (s2_pad *d = dm_switch2_pads(); d && n < cap; d = d->next) {
+        const s2_dev devs[3] = {d->st.pro, d->st.left, d->st.right};
+        unsigned buttons = 0;
+        for (int i = 0; i < 3; i++) if (devs[i].have) buttons |= devs[i].r.buttons;
+        const s2_dev *src = devs[0].have ? &devs[0] : devs[1].have ? &devs[1] : &devs[2];
+        out[n++] = (dm_s2_test_row){src->pid, buttons, src->r.lx, src->r.ly, src->r.rx, src->r.ry, src->r.battery_mv};
+    }
+    return n;
+}
+
 UIView *dm_gamepad_view(CGRect frame) { DmGamepad *v = [[DmGamepad alloc] initWithFrame:frame]; g_view = v; return v; }
 void dm_gamepad_arrange(UIView *view, DmLayout layout) { [(DmGamepad *)view arrange:layout]; }
 void dm_gamepad_opmode_changed(void) { [g_view opmodeChanged]; }
