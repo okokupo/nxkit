@@ -130,6 +130,7 @@ private struct LauncherView: View {
                         Text("Brings back all settings this game was tested with.")
                     }
                     CloudSavesSection()
+                    Switch2TestSection()
                     Section {
                         HStack {
                             Text("Memory available")
@@ -189,4 +190,95 @@ public func dmShowLauncher(_ viewController: UnsafeMutableRawPointer, _ done: @c
     parent.present(h, animated: false)
     fputs("launcher: \(file.settings.count) settings shown\n", stderr)
     return true
+}
+
+// ---- Switch 2 controller test view (Chen's request 2026-11-12): live button/stick echo without entering the game ----
+// Reads the shared transport's pad list directly (dm_switch2_pads, main-queue data): one card per pad, every
+// raw button bit highlighted while held, the back paddles GL/GR in their own row, sticks as raw counts.
+private struct Switch2TestView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var tick = 0
+    // (label, mask) in reading order; masks from switch2_proto.h, spelled as literals so no C enum import is needed
+    static let keys: [(String, UInt32)] = [
+        ("Y", 0x1), ("X", 0x2), ("B", 0x4), ("A", 0x8),
+        ("L", 0x400000), ("R", 0x40), ("ZL", 0x800000), ("ZR", 0x80),
+        ("+", 0x200), ("−", 0x100), ("LS", 0x800), ("RS", 0x400),
+        ("↑", 0x20000), ("↓", 0x10000), ("←", 0x80000), ("→", 0x40000),
+        ("C", 0x4000), ("HOME", 0x1000), ("截屏", 0x2000),
+        ("SL·L", 0x200000), ("SR·L", 0x100000), ("SR·R", 0x10), ("SL·R", 0x20),
+        ("左背键 GL", 0x2000000), ("右背键 GR", 0x1000000),
+    ]
+
+    var body: some View {
+        List {
+            if pods().isEmpty {
+                Section(footer: Text("启动器已开启扫描。按住 Pro 2 顶部 Sync 键直到灯效扫动；连上后此页实时点亮。")) {
+                    Text("未检测到 Switch 2 手柄").foregroundStyle(.secondary)
+                }
+            }
+            ForEach(Array(pods().enumerated()), id: \.offset) { i, pad in
+                Section("手柄 \(i + 1) · \(pad.name) · 电量 \(pad.battery)mV · 掩码 \(String(format: "0x%08x", pad.buttons))") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
+                        ForEach(Self.keys, id: \.0) { key in
+                            let on = pad.buttons & key.1 != 0
+                            Text(key.0)
+                                .font(.caption.weight(.semibold)).monospacedDigit()
+                                .frame(maxWidth: .infinity, minHeight: 34)
+                                .background(on ? AnyShapeStyle(.green.opacity(0.8)) : AnyShapeStyle(.gray.opacity(0.2)))
+                                .foregroundStyle(on ? .black : .primary)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    HStack {
+                        stickView("L", pad.lx, pad.ly); Spacer(); stickView("R", pad.rx, pad.ry)
+                    }
+                }
+            }
+        }
+        .navigationTitle("手柄测试").navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+        .task {
+            while !Task.isCancelled { tick += 1; try? await Task.sleep(for: .milliseconds(100)) }
+        }
+    }
+
+    private func stickView(_ label: String, _ x: UInt16, _ y: UInt16) -> some View {
+        let dx = Double(Int(x) - 2048) / 1700, dy = Double(Int(y) - 2048) / 1700
+        let cx = min(max(dx, -1), 1) * 14, cy = -min(max(dy, -1), 1) * 14
+        return VStack(spacing: 4) {
+            Circle().frame(width: 44, height: 44).foregroundStyle(.gray.opacity(0.15))
+                .overlay { Circle().frame(width: 16, height: 16).foregroundStyle(.blue).offset(x: cx, y: cy) }
+            Text("\(label) \(Int(x))·\(Int(y))").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+        }
+    }
+
+    // One entry per pad: merged buttons across its controllers, Pro 2's sticks/battery preferred
+    private func pods() -> [(name: String, buttons: UInt32, lx: UInt16, ly: UInt16, rx: UInt16, ry: UInt16, battery: UInt16)] {
+        guard tick >= 0 else { return [] }   // depend on tick so SwiftUI re-reads every poll
+        var out: [(String, UInt32, UInt16, UInt16, UInt16, UInt16, UInt16)] = []
+        var p = dm_switch2_pads()
+        while let pad = p {
+            let st = pad.pointee.st
+            var buttons: UInt32 = 0
+            for dev in [st.pro, st.left, st.right] where dev.have != 0 { buttons |= dev.r.buttons }
+            let src = st.pro.have != 0 ? st.pro : (st.left.have != 0 ? st.left : st.right)
+            let pid = src.pid
+            let name = pid == 0x2069 ? "Pro Controller 2" : pid == 0x2066 ? "Joy-Con 2 右" : pid == 0x2067 ? "Joy-Con 2 左" : pid == 0x2073 ? "NSO GameCube" : String(format: "0x%04x", pid)
+            out.append((name, buttons, src.r.lx, src.r.ly, src.r.rx, src.r.ry, src.r.battery_mv))
+            p = pad.pointee.next
+        }
+        return out
+    }
+}
+
+private struct Switch2TestSection: View {
+    @State private var testing = false
+    var body: some View {
+        Section {
+            Button("Switch 2 手柄测试") { testing = true }
+        } footer: {
+            Text("免进游戏：实时点亮每个按键、摇杆和背键（GL/GR）。")
+        }
+        .sheet(isPresented: $testing) { NavigationStack { Switch2TestView() } }
+    }
 }
