@@ -12,6 +12,7 @@
 #include "hle.h"
 #include "dm.h"
 #include "haptics_apple.h"
+#include "pad_switch2_apple.h"
 #include "save_sync.h"
 #import "CloudSaves.h"
 
