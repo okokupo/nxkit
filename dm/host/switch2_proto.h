@@ -155,15 +155,26 @@ static const uint8_t s2_led_pattern[8] = {0x01, 0x03, 0x07, 0x0F, 0x09, 0x05, 0x
 typedef struct { int have; uint16_t pid; s2_report r; s2_cal cal[2]; } s2_dev;   // cal[0]: the first stick slot (a Joy-Con's only stick), cal[1]: the second (Pro Controller 2's right stick)
 typedef struct { s2_dev pro, left, right; } s2_pad_state;                       // a Pro Controller 2 in pro, or Joy-Con 2s in left / right
 
-// One back paddle's slots (DM_SW2_GL_1/2/3, DM_SW2_GR_1/2/3): a paddle presses all its mapped buttons at once, so any combination is assignable.
+// One back paddle's slots (DM_SW2_GL_1/2/3, DM_SW2_GR_1/2/3): a paddle presses all its mapped buttons at once, so any combination is assignable. Each slot holds a button letter ("A", "ZR", ... or "-" = off), as the settings choices write them.
+static inline uint64_t s2_paddle_key(const char *v) {
+    if (!v || !*v || *v == '-') return 0;
+    if (!strcmp(v, "A")) return DM_BTN_A;
+    if (!strcmp(v, "B")) return DM_BTN_B;
+    if (!strcmp(v, "X")) return DM_BTN_X;
+    if (!strcmp(v, "Y")) return DM_BTN_Y;
+    if (!strcmp(v, "ZL")) return DM_BTN_ZL;
+    if (!strcmp(v, "ZR")) return DM_BTN_ZR;
+    if (!strcmp(v, "PLUS")) return DM_BTN_PLUS;
+    if (!strcmp(v, "MINUS")) return DM_BTN_MINUS;
+    if (!strcmp(v, "LS")) return DM_BTN_LS;
+    if (!strcmp(v, "RS")) return DM_BTN_RS;
+    return 0;
+}
 static inline uint64_t s2_paddle(const char *env) {
-    const char *e = getenv(env); if (!e || *e == '-') return 0;
-    uint64_t m = 0;
-    for (const char *s = e; *s; ) {
-        char *end; long v = strtol(s, &end, 10);   // keys are 1..15, the NpadButton bit order
-        if (end == s || v < 1 || v > 15) break;
-        m |= 1ull << (v - 1);
-        s = *end == '+' ? end + 1 : end;
+    char name[64]; uint64_t m = 0;
+    for (int i = 1; i <= 3; i++) {
+        snprintf(name, sizeof name, "%s_%d", env, i);
+        m |= s2_paddle_key(getenv(name));
     }
     return m;
 }
