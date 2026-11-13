@@ -1,0 +1,11 @@
+# A normal, non-seasonal hero in <id>_build/run/save (copied for each run).
+# A accepts the title, Continue and Normal difficulty; later A presses attack.
+# This route does not depend on edited drops, offline seasons or other game patches.
+save	run
+keys	20:A*6/4
+secs	95
+quick	60
+reach	900@55
+window	60	30
+shots	65,80,90
+hang	25
