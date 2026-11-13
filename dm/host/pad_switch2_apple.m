@@ -232,7 +232,7 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
                 S2Session *u = w; if (!u) return;
                 [u send:S2_CMD_PAIR sub:S2_SUB_PAIR_DONE payload:z.bytes len:z.length done:^(NSData *r4) { step(r4, "the last step", ^{
                     S2Session *v = w; if (!v) return;
-                    LOG("[sw2] %s paired with this Mac: from now on a press of any of its buttons connects it, no Sync needed", s2_kind(v->_pid));
+                    LOG("[sw2] %s paired with this host: from now on a press of any of its buttons connects it, no Sync needed", s2_kind(v->_pid));
                     done();
                 }); }];
             }); }];
@@ -455,6 +455,12 @@ static void s2_session_closed(S2Session *s) { [s teardown]; [g_sessions removeOb
                 });
             });
             return;
+        }
+#else
+        if (!g_host_known) {   // iOS has no API for this host's Bluetooth address (see s2_advert_use): bond toward a fixed sentinel instead. The wake comparison runs on the advertisement payload, not on the radio link, so a sentinel wakes and reconnects like a real address
+            const uint8_t sentinel[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32};   // "LINGS2"
+            memcpy(g_host, sentinel, 6); g_host_known = 1;
+            LOG("[sw2] iOS has no API for this host's Bluetooth address: bonding toward a fixed sentinel instead. The first Sync pairs for good; after that a button press reconnects. A Switch 2 or Mac re-bond overwrites it: hold Sync here once more");
         }
 #endif
         [self scan:c];
