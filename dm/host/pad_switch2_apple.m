@@ -21,6 +21,17 @@ static int8_t g_map[6];
 static int g_map_set;               // DM_SW2_MAP overrides the per-layout maps
 static uint8_t g_host[6];           // this host's Bluetooth address, little endian, as a bonded controller's wake advertisement carries it
 static int g_host_known;
+static char g_sw2_bond_status[160] = "no bond attempt yet";   // bond() step receipts, surfaced live in the test view (dm_switch2_bond_status)
+
+// The pair step names, for the test view's diagnostics line
+static const char *s2_step_zh(const char *what) {
+    if (strstr(what, "host address")) return "主机地址";
+    if (strstr(what, "first key")) return "key1";
+    if (strstr(what, "second key")) return "key2";
+    return "完成指令";
+}
+
+const char *dm_switch2_bond_status(void) { return g_sw2_bond_status; }
 
 s2_pad *dm_switch2_pads(void) { return g_pads; }
 
@@ -219,19 +230,24 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     arc4random_buf(k1, sizeof k1); arc4random_buf(k2, sizeof k2);
     s2_pair_host_payload(host, g_host); s2_pair_key_payload(key1, k1); s2_pair_key_payload(key2, k2);
     NSData *z = [NSData dataWithBytes:&last length:1], *h = [NSData dataWithBytes:host length:sizeof host], *a = [NSData dataWithBytes:key1 length:sizeof key1], *b = [NSData dataWithBytes:key2 length:sizeof key2];
+    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "配对写入开始：主机地址 → key1 → key2 → 完成");
     void (^step)(NSData *, const char *, void (^)(void)) = ^(NSData *r, const char *what, void (^next)(void)) {
         S2Session *s = w; if (!s) return;
-        if (!r) { LOG("[sw2] %s: pairing stopped at %s (no answer): it plays now, but needs Sync again next time", s2_kind(s->_pid), what); done(); return; }
+        if (!r) { snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "停在【%s】：手柄无回执，本次写入未完成", s2_step_zh(what)); LOG("[sw2] %s: pairing stopped at %s (no answer): it plays now, but needs Sync again next time", s2_kind(s->_pid), what); done(); return; }
         next();
     };
     [self send:S2_CMD_PAIR sub:S2_SUB_PAIR_HOST payload:h.bytes len:h.length done:^(NSData *r1) { step(r1, "the host address", ^{
         S2Session *s = w; if (!s) return;
+        snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓，写入 key1…");
         [s send:S2_CMD_PAIR sub:S2_SUB_PAIR_KEY1 payload:a.bytes len:a.length done:^(NSData *r2) { step(r2, "the first key", ^{
             S2Session *t = w; if (!t) return;
+            snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓ key1 ✓，写入 key2…");
             [t send:S2_CMD_PAIR sub:S2_SUB_PAIR_KEY2 payload:b.bytes len:b.length done:^(NSData *r3) { step(r3, "the second key", ^{
                 S2Session *u = w; if (!u) return;
+                snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓ key1 ✓ key2 ✓，写入完成指令…");
                 [u send:S2_CMD_PAIR sub:S2_SUB_PAIR_DONE payload:z.bytes len:z.length done:^(NSData *r4) { step(r4, "the last step", ^{
                     S2Session *v = w; if (!v) return;
+                    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "配对写入完成：4 步全部有回执，杀 App 重开后按任意键应能唤醒重连");
                     LOG("[sw2] %s paired with this host: from now on a press of any of its buttons connects it, no Sync needed", s2_kind(v->_pid));
                     done();
                 }); }];
