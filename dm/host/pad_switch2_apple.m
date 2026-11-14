@@ -474,7 +474,7 @@ static void s2_session_closed(S2Session *s) { [s teardown]; [g_sessions removeOb
         }
 #else
         if (!g_host_known) {   // iOS has no API for this host's Bluetooth address (see s2_advert_use): bond toward a fixed sentinel instead. The wake comparison runs on the advertisement payload, not on the radio link, so a sentinel wakes and reconnects like a real address
-            const uint8_t sentinel[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32};   // "LINGS2"
+            const uint8_t sentinel[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};   // every byte's top two bits 00: a valid public-address pattern whichever byte the pad validates as MSB (first sentinel "LINGS2" was ACKed but the pad never wake-advertised: suspecting an address-format check)
             memcpy(g_host, sentinel, 6); g_host_known = 1;
             LOG("[sw2] iOS has no API for this host's Bluetooth address: bonding toward a fixed sentinel instead. The first Sync pairs for good; after that a button press reconnects. A Switch 2 or Mac re-bond overwrites it: hold Sync here once more");
         }
