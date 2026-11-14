@@ -230,23 +230,29 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     __weak S2Session *w = self;
     __block NSMutableData *dump = [NSMutableData data];
     __block int remaining = 256;
+    __block int fails = 0;
     __block void (^readNext)(void);
     readNext = ^{
-        S2Session *s = w; if (!s) { done(); return; }
-        if (remaining <= 0) { readNext = nil; [s flashReport:dump done:done]; return; }
+        S2Session *s = w; if (!s) { readNext = nil; done(); return; }
+        if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; [s flashReport:dump done:done]; return; }   // gone or finished: report what we have
         uint32_t addr = 0x1FC000u + (uint32_t)((256 - remaining) * 32);
         remaining--;
-        [s readMemory:32 at:addr done:^(NSData *r) {
-            S2Session *t = w; if (!t) { done(); return; }
-            if (r.length >= 32) [dump appendData:r];
-            readNext();
-        }];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace: a flood of reads right after pairing knocked the pad off once
+            S2Session *t = w; if (!t) { readNext = nil; done(); return; }
+            [t readMemory:32 at:addr done:^(NSData *r) {
+                S2Session *u = w; if (!u) { readNext = nil; done(); return; }
+                if (r.length >= 32) { [dump appendData:r]; fails = 0; }
+                else if (++fails >= 3) { readNext = nil; [u flashReport:dump done:done]; return; }   // the pad stopped answering: report what we got
+                readNext();
+            }];
+        });
     };
     readNext();
 }
 
 - (void)flashReport:(NSData *)dump done:(void (^)(void))done {
     const uint8_t *d = dump.bytes; size_t n = dump.length;
+    if (!n) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：手柄未应答扫描（已断线或固件忙）"); done(); return; }
     const uint8_t v1[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32}, v2[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
     BOOL has1 = NO, has2 = NO, hostRec = NO; char cand[18] = "-";
     for (size_t i = 0; i + 14 <= n; i++) {
@@ -264,7 +270,14 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
 // Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
 - (void)bond:(void (^)(void))done {
     __weak S2Session *w = self;
-    [self bondWrites:^{ S2Session *s = w; if (!s) { done(); return; } [s scanFlash:done]; }];   // either way, afterwards read the pad's user flash: did our writes land, and is a real console's record already there?
+    [self bondWrites:^{   // either way, afterwards read the pad's user flash: did our writes land, and is a real console's record already there? (2s grace, then paced, aborts on disconnect)
+        S2Session *s = w; if (!s) { done(); return; }
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "配对后 2 秒开始扫描手柄 flash…");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            S2Session *t = w; if (!t) { done(); return; }
+            [t scanFlash:done];
+        });
+    }];
 }
 
 - (void)bondWrites:(void (^)(void))done {
