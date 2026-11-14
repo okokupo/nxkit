@@ -240,22 +240,26 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     ladder = ^(int step) {
         S2Session *s = w; if (!s) { abortWith("Flash：Canary 阶段会话断开 → 读取路线存疑"); return; }
         switch (step) {
-            case 0:
+            case 0: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary① 对照读 0x0B@0x1FC042…");
                 [s readMemory:0x0B at:0x001FC042u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary① 时会话断开（对照读取都断链？）"); return; } if (!r) { abortWith("Flash：Canary① 无回执，扫描无意义"); return; } ladder(1); }];
                 break;
-            case 1:
+            }
+            case 1: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary② 0x20@0x1FC000…");
                 [s readMemory:32 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary②(32B) 时会话断开 → 32 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 32; remaining = 255; readNext(); return; } ladder(2); }];
                 break;
-            case 2:
+            }
+            case 2: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary③ 0x40@0x1FC000…");
                 [s readMemory:0x40 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary③(64B) 时会话断开 → 64 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 64; remaining = 127; readNext(); return; } ladder(3); }];
                 break;
-            case 3:
+            }
+            case 3: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary④ 0x0B@0x1FC000…");
                 [s readMemory:0x0B at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary④ 时会话断开 → 0x1FC000 这个地址判死"); return; } if (r) { [dump appendData:r]; chunk = 0x0B; remaining = 744; readNext(); return; } abortWith("Flash：全部 Canary 无回执 → 固件不回应该区读取"); }];
                 break;
+            }
         }
     };
 
