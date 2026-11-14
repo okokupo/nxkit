@@ -23,6 +23,7 @@ static uint8_t g_host[6];           // this host's Bluetooth address, little end
 static int g_host_known;
 static char g_sw2_bond_status[160] = "no bond attempt yet";   // bond() step receipts, surfaced live in the test view (dm_switch2_bond_status)
 static char g_sw2_flash_status[256] = "Sync 连上后先扫 flash 再写配对…";   // what the pre-bond user-flash dump showed (dm_switch2_flash_status)
+static char g_sw2_info_status[256] = "Info 区未读…";   // what the 0x13000 info block showed (dm_switch2_info_status)
 
 // The pair step names, for the test view's diagnostics line
 static const char *s2_step_zh(const char *what) {
@@ -34,6 +35,7 @@ static const char *s2_step_zh(const char *what) {
 
 const char *dm_switch2_bond_status(void) { return g_sw2_bond_status; }
 const char *dm_switch2_flash_status(void) { return g_sw2_flash_status; }
+const char *dm_switch2_info_status(void) { return g_sw2_info_status; }
 
 s2_pad *dm_switch2_pads(void) { return g_pads; }
 
@@ -229,21 +231,44 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
 - (void)scanFlash:(void (^)(void))done {
     __weak S2Session *w = self;
     __block NSMutableData *dump = [NSMutableData data];
+    __block NSMutableData *info = [NSMutableData data];
     __block int remaining = 0;             // reads left after the canary; set by whichever length the firmware tolerates
     __block int fails = 0;
     __block int reads = 0;
     __block int chunk = 32;
+    __block uint32_t nextAddr = 0x1FD800u; // first 6KB of the user region already proven blank (v8/v9) — scan only the back half
     __block BOOL finished = NO;
     __block void (^readNext)(void);
     __block void (^ladder)(int);
+    __block void (^infoNext)(void);
+    __block void (^startUserBack)(void);
     void (^abortWith)(const char *) = ^(const char *msg) { if (finished) return; finished = YES; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "%s", msg); done(); };
-    void (^finishReport)(const char *) = ^(const char *note) { if (finished) return; finished = YES; s2_flash_report(dump.bytes, dump.length, note); done(); };
+    void (^finishReport)(const char *) = ^(const char *note) { if (finished) return; finished = YES; if (info.length) s2_info_report(info.bytes, info.length); s2_flash_report(dump.bytes, dump.length, note); done(); };
 
     // Watchdog: whatever wedges (pad stops answering, timers suspended in background, teardown delayed), always land a verdict within 15s — partial dumps are evidence too.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         S2Session *s = w; if (!s || finished) return;
         finishReport("看门狗到点，以下为已扫部分");
     });
+
+    startUserBack = ^{ readNext(); };
+
+    // Info block (0x13000, 256B): the pad saw our REAL link-layer address at connect time — if the firmware records it anywhere, this factory/info area is the best bet.
+    infoNext = ^{
+        S2Session *s = w; if (!s) { finishReport("断链，部分数据"); return; }
+        if (info.length >= 256) { s2_info_report(info.bytes, info.length); startUserBack(); return; }
+        uint32_t a = 0x00130000u + (uint32_t)info.length;
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Info 区 %zu/256B…", info.length);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+            S2Session *t = w; if (!t) { finishReport("断链，部分数据"); return; }
+            [t readMemory:32 at:a done:^(NSData *r) {
+                S2Session *u = w; if (!u) { if (info.length) s2_info_report(info.bytes, info.length); finishReport("断链，部分数据"); return; }
+                if (r.length >= 32) { [info appendData:r]; fails = 0; }
+                else if (++fails >= 2) { if (info.length) s2_info_report(info.bytes, info.length); startUserBack(); return; }   // info unreadable: carry on with the user region
+                infoNext();
+            }];
+        });
+    };
 
     // Canary ladder: the pad dropped the link mid-scan twice (v5 flood, v7 first read). readCal reads 0x0B from this very region in every handshake without trouble, so one of {length, count, exact address} is the trigger. Probe each, then scan with whichever length survives.
     ladder = ^(int step) {
@@ -256,17 +281,17 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             }
             case 1: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary② 0x20@0x1FC000…");
-                [s readMemory:32 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary②(32B) 时会话断开 → 32 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 32; remaining = 255; readNext(); return; } ladder(2); }];
+                [s readMemory:32 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary②(32B) 时会话断开 → 32 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 32; remaining = 63; infoNext(); return; } ladder(2); }];
                 break;
             }
             case 2: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary③ 0x40@0x1FC000…");
-                [s readMemory:0x40 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary③(64B) 时会话断开 → 64 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 64; remaining = 127; readNext(); return; } ladder(3); }];
+                [s readMemory:0x40 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary③(64B) 时会话断开 → 64 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 64; remaining = 31; infoNext(); return; } ladder(3); }];
                 break;
             }
             case 3: {
                 snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary④ 0x0B@0x1FC000…");
-                [s readMemory:0x0B at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary④ 时会话断开 → 0x1FC000 这个地址判死"); return; } if (r) { [dump appendData:r]; chunk = 0x0B; remaining = 744; readNext(); return; } abortWith("Flash：全部 Canary 无回执 → 固件不回应该区读取"); }];
+                [s readMemory:0x0B at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary④ 时会话断开 → 0x1FC000 这个地址判死"); return; } if (r) { [dump appendData:r]; chunk = 0x0B; remaining = 186; infoNext(); return; } abortWith("Flash：全部 Canary 无回执 → 固件不回应该区读取"); }];
                 break;
             }
         }
@@ -275,9 +300,9 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     readNext = ^{
         S2Session *s = w; if (!s) { readNext = nil; finishReport("断链，部分数据"); return; }
         if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; finishReport(remaining <= 0 ? "完整扫描" : "连接丢失，部分数据"); return; }   // gone or finished: report what we have
-        uint32_t addr = 0x1FC000u + (uint32_t)dump.length;
+        uint32_t addr = nextAddr; nextAddr += (uint32_t)chunk;
         remaining--; reads++;
-        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuKB（第%d次读取）…", dump.length / 1024, reads + 1);
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuB（第%d次读取）…", dump.length, reads + 1);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace
             S2Session *t = w; if (!t) { readNext = nil; finishReport("断链，部分数据"); return; }
             [t readMemory:(uint8_t)chunk at:addr done:^(NSData *r) {
@@ -314,6 +339,26 @@ static void s2_flash_report(const uint8_t *d, size_t n, const char *note) {
 - (void)flashReport:(NSData *)dump done:(void (^)(void))done {
     s2_flash_report(dump.bytes, dump.length, "完整扫描");
     done();
+}
+
+// Info block report: the pad watched our REAL radio address at connect time — hunt for a host record (00 02 + addr×2) or our sentinel in what we read
+static void s2_info_report(const uint8_t *d, size_t n) {
+    if (!n) { snprintf(g_sw2_info_status, sizeof g_sw2_info_status, "Info：无数据（固件拒绝或断链）"); return; }
+    const uint8_t v2[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
+    BOOL host = NO; char cand[18] = "-";
+    for (size_t i = 0; i + 14 <= n; i++) {
+        if (d[i] == 0x00 && d[i + 1] == 0x02 && memcmp(d + i + 2, d + i + 8, 6) == 0 && (d[i + 2] | d[i + 3] | d[i + 4] | d[i + 5] | d[i + 6] | d[i + 7])) {
+            host = YES;
+            snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
+            break;
+        }
+    }
+    BOOL sent = NO;
+    for (size_t i = 0; i + 6 <= n; i++) if (memcmp(d + i, v2, 6) == 0) { sent = YES; break; }
+    size_t nz = 0; for (size_t i = 0; i < n; i++) if (d[i] != 0xFF && d[i] != 0x00) nz++;
+    char peek[40];
+    for (int i = 0; i < 12; i++) snprintf(peek + i * 3, 4, "%02X ", d[i]);
+    snprintf(g_sw2_info_status, sizeof g_sw2_info_status, "Info %zuB： %s主机=%s； sentinel新%s； 非空%zuB； 头12B %s", n, host ? "疑似" : "无", cand, sent ? "在" : "无", nz, peek);
 }
 
 // Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
