@@ -679,6 +679,16 @@ void dm_switch2_active(int on) {
 
 static S2Central *g_delegate;
 static void s2_central_start(void) { g_central = [[CBCentralManager alloc] initWithDelegate:g_delegate queue:nil options:nil]; }
+// Test view: the wake-address advert and this app's unfiltered scan fight for the radio on iOS (startAdvertising left pending forever while scanning) — pause the scan while the address is being read; connected pads stay connected, only new discovery stops
+int dm_switch2_scan_pause(void) {
+    if (!g_central || g_central.state != CBManagerStatePoweredOn) return -1;
+    [g_central stopScan];
+    LOG("[sw2] scan paused: the wake-address advert takes the radio");
+    return 0;
+}
+void dm_switch2_scan_resume(void) {
+    if (g_central && g_central.state == CBManagerStatePoweredOn && g_delegate) [g_delegate scan:g_central];
+}
 // The rumble tick runs while a controller is connected (attachPad starts it, s2_session_closed stops it with the last one), not for the whole game
 static void s2_rumble_timer(void) {
     BOOL any = NO; for (S2Session *s in g_sessions.allValues) if (s.live) { any = YES; break; }

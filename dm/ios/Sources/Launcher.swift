@@ -203,6 +203,7 @@ private final class HostAdvertBox: NSObject, CBPeripheralManagerDelegate {
     private let pm = CBPeripheralManager()
     private var want = false
     private(set) var status = "未启动"
+    var advertising: Bool { pm.isAdvertising }
     private let uuid = CBUUID(string: "F5EA0001-5EA0-4C6E-9A1B-2B6E0A88A0F5")   // a service in the packet keeps the advert real and easy to spot in nRF
     func start() {
         want = true
@@ -260,7 +261,7 @@ private struct Switch2TestView: View {
                 Text(ix.isEmpty ? "Info 区未读" : ix).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
             Section(footer: Text("此页打开时本机自动广播为 DmIOS-host：用安卓 nRF Connect 扫描，抄下它的蓝牙地址填进来。iOS 隐藏本机地址，而手柄唤醒广播只发给它存的地址——填真实地址本机才能收到。应用后：按住 Sync 重配对 → 杀App重开 → 按任意键。")) {
-                Text("本机广播：" + HostAdvertBox.shared.status).font(.caption.monospaced()).foregroundStyle(.secondary)
+                Text("本机广播：\(HostAdvertBox.shared.status) / isAdvertising=\(HostAdvertBox.shared.advertising ? "是" : "否")").font(.caption.monospaced()).foregroundStyle(.secondary)
                 HStack {
                     TextField("aa:bb:cc:dd:ee:ff", text: $hostField)
                         .font(.caption.monospaced())
@@ -272,6 +273,7 @@ private struct Switch2TestView: View {
                         UserDefaults.standard.set(a, forKey: "launcher.DM_SW2_HOST")
                         setenv("DM_SW2_HOST", a, 1)
                         dm_switch2_set_host(a)
+                        dm_switch2_scan_resume()   // address is in: discovery comes back for the Sync re-pair
                     }
                 }
                 Button("测试震动（先连上手柄）") { dm_switch2_rumble_test() }
@@ -305,9 +307,11 @@ private struct Switch2TestView: View {
         .onAppear {
             applySw2HostEnv()
             hostField = UserDefaults.standard.string(forKey: "launcher.DM_SW2_HOST") ?? ""
+            dm_switch2_scan_pause()      // give the advert the radio (iOS queues it forever behind our unfiltered scan)
             HostAdvertBox.shared.start()
             dm_switch2_ensure_started()   // opened before the transport started: start it now
-        }   // no onDisappear stop: leaving the page keeps the advert alive (the state callback never re-fires, so stop would kill it for good)
+        }
+        .onDisappear { dm_switch2_scan_resume() }   // leaving the page: discovery comes back (the advert stays alive)
         .task {
             while !Task.isCancelled { tick += 1; try? await Task.sleep(for: .milliseconds(100)) }
         }

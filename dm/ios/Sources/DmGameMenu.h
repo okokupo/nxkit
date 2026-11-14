@@ -17,6 +17,8 @@ const char *dm_switch2_bond_status(void);   // pad_switch2_apple.m: last bond() 
 const char *dm_switch2_flash_status(void);   // pad_switch2_apple.m: what the post-bond user-flash dump showed (sentinel landed? a real console's record?)
 void dm_switch2_set_host(const char *addr);   // pad_switch2_apple.m: set this host's Bluetooth address at runtime (test view; read the value from an Android nRF scan of this device's advert)
 void dm_switch2_rumble_test(void);            // pad_switch2_apple.m: ~1 s of strong rumble through the game's rumble path (test view)
+int dm_switch2_scan_pause(void);              // pad_switch2_apple.m: stop discovery while the test view advertises (iOS queues the advert forever behind the unfiltered scan); connected pads stay connected
+void dm_switch2_scan_resume(void);            // pad_switch2_apple.m: restart discovery (test view's 应用 button and page exit)
 const char *dm_switch2_info_status(void);    // pad_switch2_apple.m: what the 0x13000 info block showed (the pad saw our real radio address — did it record it?)
 
 // Switch 2 test view (Launcher.swift): a flat pad snapshot so Swift needs no C struct access
