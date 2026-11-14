@@ -5,6 +5,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import CoreBluetooth
 import os
 
 private func info(_ key: String) -> Any? { Bundle.main.object(forInfoDictionaryKey: key) }
@@ -145,7 +146,7 @@ private struct LauncherView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { dm_switch2_ensure_started() }   // scanning runs from the launcher: a pad pairs before the game starts
+        .onAppear { applySw2HostEnv(); dm_switch2_ensure_started() }   // scanning runs from the launcher: a pad pairs before the game starts; the saved wake address must be in the env before the transport starts
         .task {
             while !Task.isCancelled {
                 memory = os_proc_available_memory()
@@ -196,9 +197,27 @@ public func dmShowLauncher(_ viewController: UnsafeMutableRawPointer, _ done: @c
 // ---- Switch 2 controller test view (Chen's request 2026-11-12): live button/stick echo without entering the game ----
 // Reads the transport through the flat C snapshot (dm_switch2_test_rows): one card per pad, every
 // raw button bit highlighted while held, the back paddles GL/GR in their own row, sticks as raw counts.
+// Advertises this device so an Android nRF Connect scan can read this iPad's Bluetooth address: iOS hides it from itself, but the pad's wake advert targets the address it stored, so the iPad can only hear its own wake when that address is its real one
+private final class HostAdvertBox: NSObject, CBPeripheralManagerDelegate {
+    static let shared = HostAdvertBox()
+    private let pm = CBPeripheralManager()
+    private var want = false
+    func start() { want = true; pm.delegate = self }
+    func stop() { want = false; if pm.state == .poweredOn { pm.stopAdvertising() } }
+    func peripheralManagerDidUpdateState(_ p: CBPeripheralManager) {
+        if p.state == .poweredOn && want { p.startAdvertising([CBAdvertisementDataLocalNameKey: "DmIOS-host"]) }
+    }
+}
+
+// Saved wake address → env, before the transport starts (pad_switch2_apple.m parses DM_SW2_HOST once at start; it beats the iOS sentinel)
+private func applySw2HostEnv() {
+    if let h = UserDefaults.standard.string(forKey: "launcher.DM_SW2_HOST"), !h.isEmpty { setenv("DM_SW2_HOST", h, 1) }
+}
+
 private struct Switch2TestView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var tick = 0
+    @State private var hostField = ""
     // (label, mask) in reading order; masks from switch2_proto.h, spelled as literals so no C enum import is needed
     static let keys: [(String, UInt32)] = [
         ("Y", 0x1), ("X", 0x2), ("B", 0x4), ("A", 0x8),
@@ -219,6 +238,22 @@ private struct Switch2TestView: View {
                 Text(fs).font(.caption.monospaced()).foregroundStyle(.secondary)
                 let ix = tick >= 0 ? String(cString: dm_switch2_info_status()) : ""
                 Text(ix.isEmpty ? "Info 区未读" : ix).font(.caption.monospaced()).foregroundStyle(.secondary)
+            }
+            Section(footer: Text("此页打开时本机自动广播为 DmIOS-host：用安卓 nRF Connect 扫描，抄下它的蓝牙地址填进来。iOS 隐藏本机地址，而手柄唤醒广播只发给它存的地址——填真实地址本机才能收到。应用后：按住 Sync 重配对 → 杀App重开 → 按任意键。")) {
+                HStack {
+                    TextField("aa:bb:cc:dd:ee:ff", text: $hostField)
+                        .font(.caption.monospaced())
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button("应用") {
+                        let a = hostField.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !a.isEmpty else { return }
+                        UserDefaults.standard.set(a, forKey: "launcher.DM_SW2_HOST")
+                        setenv("DM_SW2_HOST", a, 1)
+                        dm_switch2_set_host(a)
+                    }
+                }
+                Button("测试震动（先连上手柄）") { dm_switch2_rumble_test() }
             }
             if pods().isEmpty {
                 Section(footer: Text("启动器已开启扫描。按住 Pro 2 顶部 Sync 键直到灯效扫动；连上后此页实时点亮。")) {
@@ -246,7 +281,13 @@ private struct Switch2TestView: View {
         }
         .navigationTitle("手柄测试").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
-        .onAppear { dm_switch2_ensure_started() }   // opened before the transport started: start it now
+        .onAppear {
+            applySw2HostEnv()
+            hostField = UserDefaults.standard.string(forKey: "launcher.DM_SW2_HOST") ?? ""
+            HostAdvertBox.shared.start()
+            dm_switch2_ensure_started()   // opened before the transport started: start it now
+        }
+        .onDisappear { HostAdvertBox.shared.stop() }
         .task {
             while !Task.isCancelled { tick += 1; try? await Task.sleep(for: .milliseconds(100)) }
         }

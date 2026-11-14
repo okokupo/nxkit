@@ -55,6 +55,29 @@ void dm_switch2_rumble(const dm_haptic_state *st) {
     uint64_t t = now_ns();
     os_unfair_lock_lock(&g_rlog_lock); s2_rumble_log_add(&g_rlog[st->player], t, m); os_unfair_lock_unlock(&g_rlog_lock);
 }
+// Test view: set this host's Bluetooth address at runtime ("aa:bb:cc:dd:ee:ff" or "aabbccddeeff", display order). iOS hides its own address, so the value comes from an Android nRF scan while this device advertises; the pad targets the stored address when it wakes, so the iPad only hears its own wake if this is its real address
+void dm_switch2_set_host(const char *addr) {
+    unsigned v[6]; char c[5];
+    int ok = addr && sscanf(addr, "%x%c%x%c%x%c%x%c%x%c%x", &v[0], &c[0], &v[1], &c[1], &v[2], &c[2], &v[3], &c[3], &v[4], &c[4], &v[5]) == 11;
+    if (!ok) ok = addr && strlen(addr) == 12 && sscanf(addr, "%2x%2x%2x%2x%2x%2x", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]) == 6;
+    if (!ok) { snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "唤醒地址格式不对：要 aa:bb:cc:dd:ee:ff 或 12 位 hex"); return; }
+    for (int i = 0; i < 6; i++) g_host[i] = (uint8_t)v[5 - i];   // air order, as a wake advert carries it
+    g_host_known = 1;
+    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "唤醒地址已设 %02x:%02x:%02x:%02x:%02x:%02x → 按住 Sync 重新配对落盘，再杀App重开按任意键", v[0], v[1], v[2], v[3], v[4], v[5]);
+}
+// Test view: ~1 s of strong rumble on player 1 through the game's rumble path (dm_switch2_rumble → 15 ms tick → BLE); the tick runs while any controller is live, so connect first
+void dm_switch2_rumble_test(void) {
+    static NSTimer *t;
+    if (t) return;   // a burst is already running
+    __block int left = 66;
+    t = [NSTimer scheduledTimerWithTimeInterval:0.016 repeats:YES block:^(NSTimer *tt) {
+        dm_haptic_state st; memset(&st, 0, sizeof st);
+        dm_vibration v = {1.0f, 0.3f, 1.0f, 0.6f};
+        st.player = 0; st.motor[0] = v; st.motor[1] = v;
+        dm_switch2_rumble(&st);
+        if (--left <= 0) { [tt invalidate]; t = nil; }
+    }];
+}
 static NSTimer *g_rumble_timer;
 static struct { uint64_t last, maxgap, ticks, sent, busy, t0; } g_rstat;   // DM_SW2_VERBOSE: the rumble tick's spacing and the packets sent, each second
 // One sample as the console treats it before coding: both bands scaled so that they add up to at most 0.98 (switch2_proto.h s2_rumble_cap)
@@ -377,7 +400,7 @@ __attribute__((unused)) static void s2_info_report(const uint8_t *d, size_t n) {
     size_t common = pre.length < post.length ? pre.length : post.length;
     int changed = !common || memcmp(q, p, common) != 0;
     if (raw || revm)
-        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "✅ 记录已落盘！地址%s（%s字节序匹配sentinel）→ 杀App重开按任意键测唤醒", a, raw ? "正序" : "反序");
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "✅ 记录已落盘！地址%s（%s字节序=当前唤醒地址）→ 杀App重开按任意键测唤醒", a, raw ? "正序" : "反序");
     else if (changed)
         snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "⚠️ 记录区变了但非sentinel：前%s/%s→后%s/%s，截图发小凌", pa, aa, h0, a);
     else
