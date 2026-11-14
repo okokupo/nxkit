@@ -255,13 +255,15 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
 
     // Info block (0x13000, 256B): the pad saw our REAL link-layer address at connect time — if the firmware records it anywhere, this factory/info area is the best bet.
     infoNext = ^{
+        if (finished) return;   // watchdog or a previous chain already closed the scan: never run two chains at once (v11 crash suspect)
         S2Session *s = w; if (!s) { finishReport("断链，部分数据"); return; }
         if (info.length >= 256) { s2_info_report(info.bytes, info.length); startUserBack(); return; }
         uint32_t a = 0x00130000u + (uint32_t)info.length;
         snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Info 区 %zu/256B…", info.length);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-            S2Session *t = w; if (!t) { finishReport("断链，部分数据"); return; }
+            S2Session *t = w; if (!t || finished) { finishReport("断链，部分数据"); return; }
             [t readMemory:32 at:a done:^(NSData *r) {
+                if (finished) return;   // watchdog fired mid-read: drop this stale callback
                 S2Session *u = w; if (!u) { if (info.length) s2_info_report(info.bytes, info.length); finishReport("断链，部分数据"); return; }
                 if (r.length >= 32) { [info appendData:r]; fails = 0; }
                 else if (++fails >= 2) { if (info.length) s2_info_report(info.bytes, info.length); startUserBack(); return; }   // info unreadable: carry on with the user region
@@ -272,6 +274,7 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
 
     // Canary ladder: the pad dropped the link mid-scan twice (v5 flood, v7 first read). readCal reads 0x0B from this very region in every handshake without trouble, so one of {length, count, exact address} is the trigger. Probe each, then scan with whichever length survives.
     ladder = ^(int step) {
+        if (finished) return;   // scan already closed
         S2Session *s = w; if (!s) { abortWith("Flash：Canary 阶段会话断开 → 读取路线存疑"); return; }
         switch (step) {
             case 0: {
@@ -298,17 +301,19 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     };
 
     readNext = ^{
-        S2Session *s = w; if (!s) { readNext = nil; finishReport("断链，部分数据"); return; }
-        if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; finishReport(remaining <= 0 ? "完整扫描" : "连接丢失，部分数据"); return; }   // gone or finished: report what we have
+        if (finished) return;   // scan already closed (watchdog/bond may have taken over)
+        S2Session *s = w; if (!s) { finishReport("断链，部分数据"); return; }
+        if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { finishReport(remaining <= 0 ? "完整扫描" : "连接丢失，部分数据"); return; }   // gone or finished: report what we have (never nil self while executing)
         uint32_t addr = nextAddr; nextAddr += (uint32_t)chunk;
         remaining--; reads++;
         snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuB（第%d次读取）…", dump.length, reads + 1);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace
-            S2Session *t = w; if (!t) { readNext = nil; finishReport("断链，部分数据"); return; }
+            S2Session *t = w; if (!t || finished) { finishReport("断链，部分数据"); return; }
             [t readMemory:(uint8_t)chunk at:addr done:^(NSData *r) {
-                S2Session *u = w; if (!u) { readNext = nil; finishReport("断链，部分数据"); return; }
+                if (finished) return;   // watchdog fired mid-read: drop this stale callback
+                S2Session *u = w; if (!u) { finishReport("断链，部分数据"); return; }
                 if (r.length >= (NSUInteger)chunk) { [dump appendData:r]; fails = 0; }
-                else if (++fails >= 3) { readNext = nil; finishReport("3 次无回执，中止"); return; }   // the pad stopped answering: report what we got
+                else if (++fails >= 3) { finishReport("3 次无回执，中止"); return; }   // the pad stopped answering: report what we got
                 readNext();
             }];
         });
