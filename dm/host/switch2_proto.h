@@ -25,16 +25,17 @@ enum { S2_PID_JOYCON_R = 0x2066, S2_PID_JOYCON_L = 0x2067, S2_PID_PRO = 0x2069 }
 #define S2_UUID_CMD_WR  "649D4AC9-8EB7-4E6C-AF44-1EA54FE5F005"   // commands
 #define S2_UUID_CMD_RSP "C765A961-D9D8-4D36-A20A-5315B111836A"   // command replies (notifications)
 
-enum { S2_CMD_MEMORY = 0x02, S2_CMD_LEDS = 0x09, S2_CMD_FEATURE = 0x0C, S2_CMD_PAIR = 0x15 };
+enum { S2_CMD_BT = 0x03, S2_CMD_MEMORY = 0x02, S2_CMD_LEDS = 0x09, S2_CMD_FEATURE = 0x0C, S2_CMD_PAIR = 0x15 };
 enum { S2_SUB_MEMORY_READ = 0x04, S2_SUB_LEDS_SET = 0x07, S2_SUB_FEATURE_SET = 0x02, S2_SUB_FEATURE_ENABLE = 0x04,
-       S2_SUB_PAIR_HOST = 0x01, S2_SUB_PAIR_KEY1 = 0x04, S2_SUB_PAIR_KEY2 = 0x02, S2_SUB_PAIR_DONE = 0x03 };
+       S2_SUB_PAIR_HOST = 0x01, S2_SUB_PAIR_KEY1 = 0x04, S2_SUB_PAIR_KEY2 = 0x02, S2_SUB_PAIR_DONE = 0x03,
+       S2_SUB_BT_SEND_PAIR = 0x07, S2_SUB_BT_STORE_PAIR = 0x09 };
 // Features to switch on: buttons, sticks, motion, battery current and the magnetometer (the mask the console uses; all bits makes a Joy-Con 2 report phantom ZL / ZR)
 #define S2_FEATURES (0x01 | 0x02 | 0x04 | 0x20 | 0x80)
 // The Joy-Con 2's mouse sensor (on its rail side): its own feature bit; the console sets it while a game reads the sensor. Measured on a right Joy-Con 2 slid on a desk: report 0x10 and
 // 0x12 are int16 position counters that wrap (x right, y toward the player), 0x14 and 0x16 jump from about 1,600 and 150 on a surface to about 4,600 and 3,200 when lifted
 #define S2_FEATURE_MOUSE 0x10
 #define S2_MOUSE_SURFACE_MAX 1000   // 0x16 below this: on a surface
-enum { S2_ADDR_INFO = 0x00013000u, S2_ADDR_FACTORY_STICK1 = 0x000130A8u, S2_ADDR_FACTORY_STICK2 = 0x000130E8u, S2_ADDR_USER_STICK1 = 0x001FC042u, S2_ADDR_USER_STICK2 = 0x001FC062u };
+enum { S2_ADDR_INFO = 0x00013000u, S2_ADDR_FACTORY_STICK1 = 0x000130A8u, S2_ADDR_FACTORY_STICK2 = 0x000130E8u, S2_ADDR_USER_STICK1 = 0x001FC042u, S2_ADDR_USER_STICK2 = 0x001FC062u, S2_ADDR_PAIRING = 0x001FA000u };
 
 // Raw button bits (32-bit little endian at report offset 4; the top three bits are always set). The right Joy-Con's rail buttons are 0x10 / 0x20 and the left's 0x100000 / 0x200000
 // (the Switch 1 order: SR before SL).
@@ -112,6 +113,8 @@ static inline int s2_advert_use(const s2_advert *a, const uint8_t *host) {
 #define S2_PAIR_KEY_LEN 17
 static inline void s2_pair_host_payload(uint8_t out[S2_PAIR_HOST_LEN], const uint8_t host[6]) { out[0] = 0x00; out[1] = 0x02; memcpy(out + 2, host, 6); memcpy(out + 8, host, 6); }
 static inline void s2_pair_key_payload(uint8_t out[S2_PAIR_KEY_LEN], const uint8_t key[16]) { out[0] = 0x00; memcpy(out + 1, key, 16); }
+// The community-documented bypass (ndeadly/switch2_controller_research): command 0x03 sub 0x07 carries a 6-byte host address and a 16-byte LTK directly, and sub 0x09 stores them into the pairing-record sector at 0x1FA000 — no 0x15 handshake required
+static inline void s2_pair_info_payload(uint8_t out[22], const uint8_t host[6], const uint8_t ltk[16]) { memcpy(out, host, 6); memcpy(out + 6, ltk, 16); }
 
 // The controller info block (0x40 bytes at S2_ADDR_INFO): serial at 2 (14 characters), vendor id at 18, product id at 20
 static inline int s2_info_parse(const uint8_t *d, size_t n, uint16_t *vid, uint16_t *pid, char serial[15]) {

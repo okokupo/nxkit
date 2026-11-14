@@ -22,11 +22,14 @@ static int g_map_set;               // DM_SW2_MAP overrides the per-layout maps
 static uint8_t g_host[6];           // this host's Bluetooth address, little endian, as a bonded controller's wake advertisement carries it
 static int g_host_known;
 static char g_sw2_bond_status[160] = "no bond attempt yet";   // bond() step receipts, surfaced live in the test view (dm_switch2_bond_status)
-static char g_sw2_flash_status[256] = "Sync 连上后先扫 flash 再写配对…";   // what the pre-bond user-flash dump showed (dm_switch2_flash_status)
+static char g_sw2_flash_status[256] = "旁路配对后自动验证 0x1FA000 记录区…";   // what the pairing-record sector showed before/after the store (dm_switch2_flash_status)
 static char g_sw2_info_status[256] = "Info 区未读…";   // what the 0x13000 info block showed (dm_switch2_info_status)
 
 // The pair step names, for the test view's diagnostics line
 static const char *s2_step_zh(const char *what) {
+    if (strstr(what, "pre-store")) return "记录区原始读取";
+    if (strstr(what, "pair info")) return "配对信息(0x07)";
+    if (strstr(what, "store")) return "落盘指令(0x09)";
     if (strstr(what, "host address")) return "主机地址";
     if (strstr(what, "first key")) return "key1";
     if (strstr(what, "second key")) return "key2";
@@ -196,7 +199,7 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             }];
         };
         void (^calibrate)(void) = ^{ S2Session *a = w; if (!a) return; [a seedRest:calibrate0]; };
-        if (s->_use == S2_ADV_PAIR) { __weak S2Session *ws = s; [s scanFlash:^{ S2Session *sc = ws; if (!sc) return; [sc bond:calibrate]; }]; } else calibrate();   // the pad drops the link the moment PAIR_DONE lands: read its flash BEFORE bonding, never after
+        if (s->_use == S2_ADV_PAIR) { [s bond:calibrate]; } else calibrate();   // v14: bond reads the pairing-record sector (0x1FA000) before and after the store itself, no separate flash scan
     }];
 }
 // The gyro offset before the controller has lain still for a second (s2_rest): the one learned for this controller in an earlier session, kept under its serial number,
@@ -324,41 +327,61 @@ __attribute__((unused)) static void s2_info_report(const uint8_t *d, size_t n) {
     snprintf(g_sw2_info_status, sizeof g_sw2_info_status, "Info %zuB： %s主机=%s； sentinel新%s； 非空%zuB； 头12B %s", n, host ? "疑似" : "无", cand, sent ? "在" : "无", nz, peek);
 }
 
-// Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
+// Sync is held on this controller (its advertisement named no host): store this host's address via the community bypass — 0x03 0x07 sends address + LTK, 0x03 0x09 commits it to flash, no 0x15 handshake (whose PAIR_DONE drops the link)
 - (void)bond:(void (^)(void))done {
-    [self bondWrites:done];   // the pad drops the link the moment PAIR_DONE lands, so the flash dump runs before these writes (see handshake) — never after
+    [self bondWrites:done];
 }
 
 - (void)bondWrites:(void (^)(void))done {
     __weak S2Session *w = self;
-    uint8_t host[S2_PAIR_HOST_LEN], k1[16], k2[16], key1[S2_PAIR_KEY_LEN], key2[S2_PAIR_KEY_LEN], last = 0;
-    arc4random_buf(k1, sizeof k1); arc4random_buf(k2, sizeof k2);
-    s2_pair_host_payload(host, g_host); s2_pair_key_payload(key1, k1); s2_pair_key_payload(key2, k2);
-    NSData *z = [NSData dataWithBytes:&last length:1], *h = [NSData dataWithBytes:host length:sizeof host], *a = [NSData dataWithBytes:key1 length:sizeof key1], *b = [NSData dataWithBytes:key2 length:sizeof key2];
-    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "配对写入开始：主机地址 → key1 → key2 → 完成");
+    uint8_t ltk[16], info[22];
+    arc4random_buf(ltk, sizeof ltk);
+    s2_pair_info_payload(info, g_host, ltk);
+    NSData *pi = [NSData dataWithBytes:info length:sizeof info];
+    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "旁路配对开始：读记录区原始状态…");
     void (^step)(NSData *, const char *, void (^)(void)) = ^(NSData *r, const char *what, void (^next)(void)) {
         S2Session *s = w; if (!s) return;
-        if (!r) { snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "停在【%s】：手柄无回执，本次写入未完成", s2_step_zh(what)); LOG("[sw2] %s: pairing stopped at %s (no answer): it plays now, but needs Sync again next time", s2_kind(s->_pid), what); done(); return; }
+        if (!r) { snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "停在【%s】：手柄无回执", s2_step_zh(what)); LOG("[sw2] %s: bypass pairing stopped at %s (no answer)", s2_kind(s->_pid), what); done(); return; }
         next();
     };
-    [self send:S2_CMD_PAIR sub:S2_SUB_PAIR_HOST payload:h.bytes len:h.length done:^(NSData *r1) { step(r1, "the host address", ^{
+    [self readMemory:0x20 at:S2_ADDR_PAIRING done:^(NSData *pre) { step(pre, "the pre-store record read", ^{
         S2Session *s = w; if (!s) return;
-        snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓，写入 key1…");
-        [s send:S2_CMD_PAIR sub:S2_SUB_PAIR_KEY1 payload:a.bytes len:a.length done:^(NSData *r2) { step(r2, "the first key", ^{
+        snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "原始状态已读，0x07 发送配对信息…");
+        [s send:S2_CMD_BT sub:S2_SUB_BT_SEND_PAIR payload:pi.bytes len:pi.length done:^(NSData *r1) { step(r1, "the pair info", ^{
             S2Session *t = w; if (!t) return;
-            snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓ key1 ✓，写入 key2…");
-            [t send:S2_CMD_PAIR sub:S2_SUB_PAIR_KEY2 payload:b.bytes len:b.length done:^(NSData *r3) { step(r3, "the second key", ^{
+            snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "配对信息 ✓，0x09 请求落盘…");
+            [t send:S2_CMD_BT sub:S2_SUB_BT_STORE_PAIR payload:nil len:0 done:^(NSData *r2) { step(r2, "the store command", ^{
                 S2Session *u = w; if (!u) return;
-                snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "主机地址 ✓ key1 ✓ key2 ✓，写入完成指令…");
-                [u send:S2_CMD_PAIR sub:S2_SUB_PAIR_DONE payload:z.bytes len:z.length done:^(NSData *r4) { step(r4, "the last step", ^{
+                snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "落盘指令 ✓，回读记录区验证…");
+                [u readMemory:0x20 at:S2_ADDR_PAIRING done:^(NSData *post) {
                     S2Session *v = w; if (!v) return;
-                    snprintf(g_sw2_bond_status, sizeof g_sw2_bond_status, "配对写入完成：4 步全部有回执，杀 App 重开后按任意键应能唤醒重连");
-                    LOG("[sw2] %s paired with this host: from now on a press of any of its buttons connects it, no Sync needed", s2_kind(v->_pid));
+                    [v reportPairingRecord:pre post:post];
+                    LOG("[sw2] %s bypass pair store: %s", s2_kind(v->_pid), g_sw2_flash_status);
                     done();
-                }); }];
+                }];
             }); }];
         }); }];
     }); }];
+}
+
+// Compare the pairing-record sector (0x1FA000: count, then 0x28-byte entries of 6-byte host address + 16-byte LTK) before and after the store, and say which of the three possible worlds we are in
+- (void)reportPairingRecord:(NSData *)pre post:(NSData *)post {
+    const uint8_t *p = post.bytes; const uint8_t *q = pre.bytes;
+    if (!p || post.length < 0x14) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "记录区回读失败（无数据或已断链）"); return; }
+    char h0[20] = "-", a[20] = "-", pa[20] = "-", aa[20] = "-";
+    snprintf(h0, sizeof h0, "%02X%02X%02X%02X", p[0], p[1], p[2], p[3]);
+    snprintf(a, sizeof a, "%02X:%02X:%02X:%02X:%02X:%02X", p[8], p[9], p[10], p[11], p[12], p[13]);
+    if (q && pre.length >= 0x14) { snprintf(pa, sizeof pa, "%02X%02X%02X%02X", q[0], q[1], q[2], q[3]); snprintf(aa, sizeof aa, "%02X:%02X:%02X:%02X:%02X:%02X", q[8], q[9], q[10], q[11], q[12], q[13]); }
+    uint8_t rev[6]; for (int i = 0; i < 6; i++) rev[i] = g_host[5 - i];
+    int raw = !memcmp(p + 8, g_host, 6), revm = !memcmp(p + 8, rev, 6);
+    size_t common = pre.length < post.length ? pre.length : post.length;
+    int changed = !common || memcmp(q, p, common) != 0;
+    if (raw || revm)
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "✅ 记录已落盘！地址%s（%s字节序匹配sentinel）→ 杀App重开按任意键测唤醒", a, raw ? "正序" : "反序");
+    else if (changed)
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "⚠️ 记录区变了但非sentinel：前%s/%s→后%s/%s，截图发小凌", pa, aa, h0, a);
+    else
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "❌ 记录区未变（前%s/%s 后%s/%s）——0x09未生效或被固件拒绝", pa, aa, h0, a);
 }
 // The features this controller reports: a Joy-Con 2's mouse sensor too once the game reads the sensors (dm_joy_mouse_wanted; the Pro Controller 2 has none), as the console
 // turns it on only for a game that uses it. Once on, it stays on while the controller is connected
