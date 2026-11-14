@@ -263,7 +263,7 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
         }
     }
-    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s； %s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无", [self flashRegionReads:d] ? "区域有数据" : "区域全空白（可能读错区）");
+    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s； %s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无", [self flashRegionReads:dump] ? "区域有数据" : "区域全空白（可能读错区）");
     done();
 }
 
