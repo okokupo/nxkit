@@ -229,25 +229,53 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
 - (void)scanFlash:(void (^)(void))done {
     __weak S2Session *w = self;
     __block NSMutableData *dump = [NSMutableData data];
-    __block int remaining = 256;
+    __block int remaining = 0;             // reads left after the canary; set by whichever length the firmware tolerates
     __block int fails = 0;
+    __block int chunk = 32;
     __block void (^readNext)(void);
+    __block void (^ladder)(int);
+    void (^abortWith)(const char *) = ^(const char *msg) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "%s", msg); done(); };
+
+    // Canary ladder: the pad dropped the link mid-scan twice (v5 flood, v7 first read). readCal reads 0x0B from this very region in every handshake without trouble, so one of {length, count, exact address} is the trigger. Probe each, then scan with whichever length survives.
+    ladder = ^(int step) {
+        S2Session *s = w; if (!s) { abortWith("Flash：Canary 阶段会话断开 → 读取路线存疑"); return; }
+        switch (step) {
+            case 0:
+                snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary① 对照读 0x0B@0x1FC042…");
+                [s readMemory:0x0B at:0x001FC042u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary① 时会话断开（对照读取都断链？）"); return; } if (!r) { abortWith("Flash：Canary① 无回执，扫描无意义"); return; } ladder(1); }];
+                break;
+            case 1:
+                snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary② 0x20@0x1FC000…");
+                [s readMemory:32 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary②(32B) 时会话断开 → 32 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 32; remaining = 255; readNext(); return; } ladder(2); }];
+                break;
+            case 2:
+                snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary③ 0x40@0x1FC000…");
+                [s readMemory:0x40 at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary③(64B) 时会话断开 → 64 字节读取判死"); return; } if (r) { [dump appendData:r]; chunk = 64; remaining = 127; readNext(); return; } ladder(3); }];
+                break;
+            case 3:
+                snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：Canary④ 0x0B@0x1FC000…");
+                [s readMemory:0x0B at:0x1FC000u done:^(NSData *r) { S2Session *t = w; if (!t) { abortWith("Flash：Canary④ 时会话断开 → 0x1FC000 这个地址判死"); return; } if (r) { [dump appendData:r]; chunk = 0x0B; remaining = 744; readNext(); return; } abortWith("Flash：全部 Canary 无回执 → 固件不回应该区读取"); }];
+                break;
+        }
+    };
+
     readNext = ^{
-        S2Session *s = w; if (!s) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
+        S2Session *s = w; if (!s) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
         if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; [s flashReport:dump done:done]; return; }   // gone or finished: report what we have
-        uint32_t addr = 0x1FC000u + (uint32_t)((256 - remaining) * 32);
+        uint32_t addr = 0x1FC000u + (uint32_t)dump.length;
         remaining--;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace: a flood of reads right after pairing knocked the pad off once
-            S2Session *t = w; if (!t) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
-            [t readMemory:32 at:addr done:^(NSData *r) {
-                S2Session *u = w; if (!u) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
-                if (r.length >= 32) { [dump appendData:r]; fails = 0; }
+        if ((dump.length & 1023u) < (uint32_t)chunk) snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuKB…", dump.length / 1024);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace
+            S2Session *t = w; if (!t) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
+            [t readMemory:(uint8_t)chunk at:addr done:^(NSData *r) {
+                S2Session *u = w; if (!u) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
+                if (r.length >= (NSUInteger)chunk) { [dump appendData:r]; fails = 0; }
                 else if (++fails >= 3) { readNext = nil; [u flashReport:dump done:done]; return; }   // the pad stopped answering: report what we got
                 readNext();
             }];
         });
     };
-    readNext();
+    ladder(0);
 }
 
 - (void)flashReport:(NSData *)dump done:(void (^)(void))done {
