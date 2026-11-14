@@ -202,10 +202,23 @@ private final class HostAdvertBox: NSObject, CBPeripheralManagerDelegate {
     static let shared = HostAdvertBox()
     private let pm = CBPeripheralManager()
     private var want = false
+    private(set) var status = "未启动"
+    private let uuid = CBUUID(string: "F5EA0001-5EA0-4C6E-9A1B-2B6E0A88A0F5")   // a service in the packet keeps the advert real and easy to spot in nRF
     func start() { want = true; pm.delegate = self }
-    func stop() { want = false; if pm.state == .poweredOn { pm.stopAdvertising() } }
+    func stop() { want = false; status = "已停"; if pm.state == .poweredOn { pm.stopAdvertising() } }
     func peripheralManagerDidUpdateState(_ p: CBPeripheralManager) {
-        if p.state == .poweredOn && want { p.startAdvertising([CBAdvertisementDataLocalNameKey: "DmIOS-host"]) }
+        switch p.state {
+        case .poweredOn:
+            status = want ? "启动中…" : "蓝牙就绪"
+            if want { p.startAdvertising([CBAdvertisementDataLocalNameKey: "DmIOS-host", CBAdvertisementDataServiceUUIDsKey: [uuid]]) }
+        case .unauthorized: status = "❌ 蓝牙权限被拒（设置里给这个 App 开蓝牙）"
+        case .poweredOff: status = "❌ 蓝牙关闭"
+        case .unsupported: status = "❌ 此设备不支持外设广播"
+        default: status = "等待蓝牙就绪…"
+        }
+    }
+    func peripheralManager(_ p: CBPeripheralManager, didStartAdvertising error: Error?) {
+        status = error == nil ? "广播中（DmIOS-host）" : "❌ 广播失败：\(error!.localizedDescription)"
     }
 }
 
@@ -240,6 +253,7 @@ private struct Switch2TestView: View {
                 Text(ix.isEmpty ? "Info 区未读" : ix).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
             Section(footer: Text("此页打开时本机自动广播为 DmIOS-host：用安卓 nRF Connect 扫描，抄下它的蓝牙地址填进来。iOS 隐藏本机地址，而手柄唤醒广播只发给它存的地址——填真实地址本机才能收到。应用后：按住 Sync 重配对 → 杀App重开 → 按任意键。")) {
+                Text("本机广播：" + HostAdvertBox.shared.status).font(.caption.monospaced()).foregroundStyle(.secondary)
                 HStack {
                     TextField("aa:bb:cc:dd:ee:ff", text: $hostField)
                         .font(.caption.monospaced())
