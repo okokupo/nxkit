@@ -35,42 +35,6 @@ static const char *s2_step_zh(const char *what) {
 const char *dm_switch2_bond_status(void) { return g_sw2_bond_status; }
 const char *dm_switch2_flash_status(void) { return g_sw2_flash_status; }
 
-// After a bond attempt, walk the pad's user flash (0x1FC000-0x1FE000, the page with the user calibration) in 32-byte reads: did our writes land at all, and is there already a real console's bond record (switch2_proto.h: the pair payload is 00 02 + the host address twice)?
-- (void)scanFlash:(void (^)(void))done {
-    __weak S2Session *w = self;
-    __block NSMutableData *dump = [NSMutableData data];
-    __block int remaining = 256;
-    __block void (^readNext)(void);
-    readNext = ^{
-        S2Session *s = w; if (!s) { done(); return; }
-        if (remaining <= 0) { readNext = nil; [s flashReport:dump done:done]; return; }
-        uint32_t addr = 0x1FC000u + (uint32_t)((256 - remaining) * 32);
-        remaining--;
-        [s readMemory:32 at:addr done:^(NSData *r) {
-            S2Session *t = w; if (!t) { done(); return; }
-            if (r.length >= 32) [dump appendData:r];
-            readNext();
-        }];
-    };
-    readNext();
-}
-
-- (void)flashReport:(NSData *)dump done:(void (^)(void))done {
-    const uint8_t *d = dump.bytes; size_t n = dump.length;
-    const uint8_t v1[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32}, v2[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
-    BOOL has1 = NO, has2 = NO, hostRec = NO; char cand[18] = "-";
-    for (size_t i = 0; i + 14 <= n; i++) {
-        if (!has1 && memcmp(d + i, v1, 6) == 0) has1 = YES;
-        if (!has2 && memcmp(d + i, v2, 6) == 0) has2 = YES;
-        if (!hostRec && d[i] == 0x00 && d[i + 1] == 0x02 && memcmp(d + i + 2, d + i + 8, 6) == 0 && (d[i + 2] | d[i + 3] | d[i + 4] | d[i + 5] | d[i + 6] | d[i + 7])) {
-            hostRec = YES;
-            snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
-        }
-    }
-    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无");
-    done();
-}
-
 s2_pad *dm_switch2_pads(void) { return g_pads; }
 
 // Rumble: each player's values as the game sets them, with their times (s2_rumble_log), written by the rumble queue (dm_switch2_rumble) and read by the main queue's tick. Every
@@ -261,6 +225,42 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     if (!_serial[0] || !_rest.have) return;
     [NSUserDefaults.standardUserDefaults setObject:@[@(_rest.bias[0]), @(_rest.bias[1]), @(_rest.bias[2])] forKey:[NSString stringWithFormat:@"sw2.gyroOffset.%s", _serial]];
 }
+// After a bond attempt, walk the pad's user flash (0x1FC000-0x1FE000, the page with the user calibration) in 32-byte reads: did our writes land at all, and is there already a real console's bond record (switch2_proto.h: the pair payload is 00 02 + the host address twice)?
+- (void)scanFlash:(void (^)(void))done {
+    __weak S2Session *w = self;
+    __block NSMutableData *dump = [NSMutableData data];
+    __block int remaining = 256;
+    __block void (^readNext)(void);
+    readNext = ^{
+        S2Session *s = w; if (!s) { done(); return; }
+        if (remaining <= 0) { readNext = nil; [s flashReport:dump done:done]; return; }
+        uint32_t addr = 0x1FC000u + (uint32_t)((256 - remaining) * 32);
+        remaining--;
+        [s readMemory:32 at:addr done:^(NSData *r) {
+            S2Session *t = w; if (!t) { done(); return; }
+            if (r.length >= 32) [dump appendData:r];
+            readNext();
+        }];
+    };
+    readNext();
+}
+
+- (void)flashReport:(NSData *)dump done:(void (^)(void))done {
+    const uint8_t *d = dump.bytes; size_t n = dump.length;
+    const uint8_t v1[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32}, v2[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
+    BOOL has1 = NO, has2 = NO, hostRec = NO; char cand[18] = "-";
+    for (size_t i = 0; i + 14 <= n; i++) {
+        if (!has1 && memcmp(d + i, v1, 6) == 0) has1 = YES;
+        if (!has2 && memcmp(d + i, v2, 6) == 0) has2 = YES;
+        if (!hostRec && d[i] == 0x00 && d[i + 1] == 0x02 && memcmp(d + i + 2, d + i + 8, 6) == 0 && (d[i + 2] | d[i + 3] | d[i + 4] | d[i + 5] | d[i + 6] | d[i + 7])) {
+            hostRec = YES;
+            snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
+        }
+    }
+    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无");
+    done();
+}
+
 // Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
 - (void)bond:(void (^)(void))done {
     __weak S2Session *w = self;
