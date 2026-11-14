@@ -22,7 +22,7 @@ static int g_map_set;               // DM_SW2_MAP overrides the per-layout maps
 static uint8_t g_host[6];           // this host's Bluetooth address, little endian, as a bonded controller's wake advertisement carries it
 static int g_host_known;
 static char g_sw2_bond_status[160] = "no bond attempt yet";   // bond() step receipts, surfaced live in the test view (dm_switch2_bond_status)
-static char g_sw2_flash_status[160] = "配对后自动扫描手柄用户 flash…";   // what the post-bond user-flash dump showed (dm_switch2_flash_status)
+static char g_sw2_flash_status[256] = "Sync 连上后先扫 flash 再写配对…";   // what the pre-bond user-flash dump showed (dm_switch2_flash_status)
 
 // The pair step names, for the test view's diagnostics line
 static const char *s2_step_zh(const char *what) {
@@ -194,7 +194,7 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             }];
         };
         void (^calibrate)(void) = ^{ S2Session *a = w; if (!a) return; [a seedRest:calibrate0]; };
-        if (s->_use == S2_ADV_PAIR) [s bond:calibrate]; else calibrate();
+        if (s->_use == S2_ADV_PAIR) { __weak S2Session *ws = s; [s scanFlash:^{ S2Session *sc = ws; if (!sc) return; [sc bond:calibrate]; }]; } else calibrate();   // the pad drops the link the moment PAIR_DONE lands: read its flash BEFORE bonding, never after
     }];
 }
 // The gyro offset before the controller has lain still for a second (s2_rest): the one learned for this controller in an earlier session, kept under its serial number,
@@ -233,14 +233,14 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     __block int fails = 0;
     __block void (^readNext)(void);
     readNext = ^{
-        S2Session *s = w; if (!s) { readNext = nil; done(); return; }
+        S2Session *s = w; if (!s) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
         if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; [s flashReport:dump done:done]; return; }   // gone or finished: report what we have
         uint32_t addr = 0x1FC000u + (uint32_t)((256 - remaining) * 32);
         remaining--;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace: a flood of reads right after pairing knocked the pad off once
-            S2Session *t = w; if (!t) { readNext = nil; done(); return; }
+            S2Session *t = w; if (!t) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
             [t readMemory:32 at:addr done:^(NSData *r) {
-                S2Session *u = w; if (!u) { readNext = nil; done(); return; }
+                S2Session *u = w; if (!u) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：连接断开，扫描中止"); done(); return; }
                 if (r.length >= 32) { [dump appendData:r]; fails = 0; }
                 else if (++fails >= 3) { readNext = nil; [u flashReport:dump done:done]; return; }   // the pad stopped answering: report what we got
                 readNext();
@@ -263,21 +263,20 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
         }
     }
-    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无");
+    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s； %s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无", [self flashRegionReads:d] ? "区域有数据" : "区域全空白（可能读错区）");
     done();
+}
+
+// erased flash reads back as FF (or sometimes 00): an entirely blank region means we are reading a place nothing ever wrote — wrong window, the pair record lives elsewhere
+- (BOOL)flashRegionReads:(NSData *)dump {
+    const uint8_t *d = dump.bytes; size_t n = dump.length;
+    for (size_t i = 0; i < n; i++) if (d[i] != 0xFF && d[i] != 0x00) return YES;
+    return NO;
 }
 
 // Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
 - (void)bond:(void (^)(void))done {
-    __weak S2Session *w = self;
-    [self bondWrites:^{   // either way, afterwards read the pad's user flash: did our writes land, and is a real console's record already there? (2s grace, then paced, aborts on disconnect)
-        S2Session *s = w; if (!s) { done(); return; }
-        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "配对后 2 秒开始扫描手柄 flash…");
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            S2Session *t = w; if (!t) { done(); return; }
-            [t scanFlash:done];
-        });
-    }];
+    [self bondWrites:done];   // the pad drops the link the moment PAIR_DONE lands, so the flash dump runs before these writes (see handshake) — never after
 }
 
 - (void)bondWrites:(void (^)(void))done {
