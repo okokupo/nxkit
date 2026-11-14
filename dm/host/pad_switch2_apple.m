@@ -231,10 +231,19 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     __block NSMutableData *dump = [NSMutableData data];
     __block int remaining = 0;             // reads left after the canary; set by whichever length the firmware tolerates
     __block int fails = 0;
+    __block int reads = 0;
     __block int chunk = 32;
+    __block BOOL finished = NO;
     __block void (^readNext)(void);
     __block void (^ladder)(int);
-    void (^abortWith)(const char *) = ^(const char *msg) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "%s", msg); done(); };
+    void (^abortWith)(const char *) = ^(const char *msg) { if (finished) return; finished = YES; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "%s", msg); done(); };
+    void (^finishReport)(const char *) = ^(const char *note) { if (finished) return; finished = YES; s2_flash_report(dump.bytes, dump.length, note); done(); };
+
+    // Watchdog: whatever wedges (pad stops answering, timers suspended in background, teardown delayed), always land a verdict within 15s — partial dumps are evidence too.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        S2Session *s = w; if (!s || finished) return;
+        finishReport("看门狗到点，以下为已扫部分");
+    });
 
     // Canary ladder: the pad dropped the link mid-scan twice (v5 flood, v7 first read). readCal reads 0x0B from this very region in every handshake without trouble, so one of {length, count, exact address} is the trigger. Probe each, then scan with whichever length survives.
     ladder = ^(int step) {
@@ -264,17 +273,17 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     };
 
     readNext = ^{
-        S2Session *s = w; if (!s) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
-        if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; [s flashReport:dump done:done]; return; }   // gone or finished: report what we have
+        S2Session *s = w; if (!s) { readNext = nil; finishReport("断链，部分数据"); return; }
+        if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; finishReport(remaining <= 0 ? "完整扫描" : "连接丢失，部分数据"); return; }   // gone or finished: report what we have
         uint32_t addr = 0x1FC000u + (uint32_t)dump.length;
-        remaining--;
-        if ((dump.length & 1023u) < (uint32_t)chunk) snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuKB…", dump.length / 1024);
+        remaining--; reads++;
+        snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuKB（第%d次读取）…", dump.length / 1024, reads + 1);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace
-            S2Session *t = w; if (!t) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
+            S2Session *t = w; if (!t) { readNext = nil; finishReport("断链，部分数据"); return; }
             [t readMemory:(uint8_t)chunk at:addr done:^(NSData *r) {
-                S2Session *u = w; if (!u) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
+                S2Session *u = w; if (!u) { readNext = nil; finishReport("断链，部分数据"); return; }
                 if (r.length >= (NSUInteger)chunk) { [dump appendData:r]; fails = 0; }
-                else if (++fails >= 3) { readNext = nil; [u flashReport:dump done:done]; return; }   // the pad stopped answering: report what we got
+                else if (++fails >= 3) { readNext = nil; finishReport("3 次无回执，中止"); return; }   // the pad stopped answering: report what we got
                 readNext();
             }];
         });
