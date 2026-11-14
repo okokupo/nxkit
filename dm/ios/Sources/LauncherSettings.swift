@@ -115,6 +115,12 @@ final class LauncherModel: ObservableObject {
         fputs("launcher: \(s.env)=\(v) (in-game menu)\n", stderr)
     }
 
+    // A toggle flipped in the launcher settings takes effect at once: stored and exported to the environment like an in-game choice, and DM_SW2 starts the Switch 2 transport immediately (scanning runs from the launcher, no Play detour needed)
+    func flip(_ s: Setting, _ on: Bool) {
+        choose(s, on ? s.onValue : s.offValue)
+        if s.env == "DM_SW2" && on { dm_switch2_ensure_started() }
+    }
+
     // DM_LAUNCHER=0: no screen, but the saved choices still apply (only DM_SAVED_CHOICES=0 ignores them); nothing is written
     func applySaved() {
         for s in settings where !fixed.contains(s.env) {
