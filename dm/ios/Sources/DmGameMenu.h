@@ -14,6 +14,7 @@ void dm_gamepad_touch_feedback(bool on);   // DM_TOUCH_HAPTICS
 bool dm_setting_live(const char *env, const char *value);   // front_ios.m: value NULL asks whether the running game takes env at once; otherwise applies it
 void dm_switch2_ensure_started(void);   // DmGamepad.m: starts the Switch 2 BLE transport once; the launcher calls it so a pad pairs before the game starts
 const char *dm_switch2_bond_status(void);   // pad_switch2_apple.m: last bond() step receipts (pad_switch2_apple.m g_sw2_bond_status), for the test view
+const char *dm_switch2_flash_status(void);   // pad_switch2_apple.m: what the post-bond user-flash dump showed (sentinel landed? a real console's record?)
 
 // Switch 2 test view (Launcher.swift): a flat pad snapshot so Swift needs no C struct access
 typedef struct dm_s2_test_row { unsigned pid, buttons; unsigned short lx, ly, rx, ry, battery_mv; } dm_s2_test_row;

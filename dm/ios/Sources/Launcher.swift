@@ -215,6 +215,8 @@ private struct Switch2TestView: View {
             Section("Bonding 诊断") {
                 let st = tick >= 0 ? String(cString: dm_switch2_bond_status()) : ""
                 Text(st.isEmpty ? "no bond attempt yet" : st).font(.caption.monospaced()).foregroundStyle(.secondary)
+                let fs = tick >= 0 ? String(cString: dm_switch2_flash_status()) : ""
+                Text(fs).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
             if pods().isEmpty {
                 Section(footer: Text("启动器已开启扫描。按住 Pro 2 顶部 Sync 键直到灯效扫动；连上后此页实时点亮。")) {
