@@ -204,7 +204,14 @@ private final class HostAdvertBox: NSObject, CBPeripheralManagerDelegate {
     private var want = false
     private(set) var status = "未启动"
     private let uuid = CBUUID(string: "F5EA0001-5EA0-4C6E-9A1B-2B6E0A88A0F5")   // a service in the packet keeps the advert real and easy to spot in nRF
-    func start() { want = true; pm.delegate = self }
+    func start() {
+        want = true
+        pm.delegate = self
+        if pm.state == .poweredOn {   // already on: the state callback fired long ago and will not fire again — advertise right now
+            status = "启动中…"
+            pm.startAdvertising([CBAdvertisementDataLocalNameKey: "DmIOS-host", CBAdvertisementDataServiceUUIDsKey: [uuid]])
+        }
+    }
     func stop() { want = false; status = "已停"; if pm.state == .poweredOn { pm.stopAdvertising() } }
     func peripheralManagerDidUpdateState(_ p: CBPeripheralManager) {
         switch p.state {
@@ -300,8 +307,7 @@ private struct Switch2TestView: View {
             hostField = UserDefaults.standard.string(forKey: "launcher.DM_SW2_HOST") ?? ""
             HostAdvertBox.shared.start()
             dm_switch2_ensure_started()   // opened before the transport started: start it now
-        }
-        .onDisappear { HostAdvertBox.shared.stop() }
+        }   // no onDisappear stop: leaving the page keeps the advert alive (the state callback never re-fires, so stop would kill it for good)
         .task {
             while !Task.isCancelled { tick += 1; try? await Task.sleep(for: .milliseconds(100)) }
         }
