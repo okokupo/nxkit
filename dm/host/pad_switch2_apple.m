@@ -264,15 +264,15 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     };
 
     readNext = ^{
-        S2Session *s = w; if (!s) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
+        S2Session *s = w; if (!s) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
         if (remaining <= 0 || s->_peripheral.state != CBPeripheralStateConnected) { readNext = nil; [s flashReport:dump done:done]; return; }   // gone or finished: report what we have
         uint32_t addr = 0x1FC000u + (uint32_t)dump.length;
         remaining--;
         if ((dump.length & 1023u) < (uint32_t)chunk) snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中 %zuKB…", dump.length / 1024);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{   // gentle pace
-            S2Session *t = w; if (!t) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
+            S2Session *t = w; if (!t) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
             [t readMemory:(uint8_t)chunk at:addr done:^(NSData *r) {
-                S2Session *u = w; if (!u) { readNext = nil; snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：扫描中会话断开（已扫 %zuKB）", dump.length / 1024); done(); return; }
+                S2Session *u = w; if (!u) { readNext = nil; s2_flash_report(dump.bytes, dump.length, "断链，部分数据"); done(); return; }
                 if (r.length >= (NSUInteger)chunk) { [dump appendData:r]; fails = 0; }
                 else if (++fails >= 3) { readNext = nil; [u flashReport:dump done:done]; return; }   // the pad stopped answering: report what we got
                 readNext();
@@ -282,9 +282,13 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
     ladder(0);
 }
 
-- (void)flashReport:(NSData *)dump done:(void (^)(void))done {
-    const uint8_t *d = dump.bytes; size_t n = dump.length;
-    if (!n) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：手柄未应答扫描（已断线或固件忙）"); done(); return; }
+// Flash report as plain C so it can still run after the session died (partial dumps are evidence too — the pairing-mode window kills the link at ~6KB)
+static BOOL s2_flash_region_reads(const uint8_t *d, size_t n) {
+    for (size_t i = 0; i < n; i++) if (d[i] != 0xFF && d[i] != 0x00) return YES;
+    return NO;
+}
+static void s2_flash_report(const uint8_t *d, size_t n, const char *note) {
+    if (!n) { snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash：手柄未应答扫描（已断线或固件忙）"); return; }
     const uint8_t v1[6] = {0x4C, 0x49, 0x4E, 0x47, 0x53, 0x32}, v2[6] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35};
     BOOL has1 = NO, has2 = NO, hostRec = NO; char cand[18] = "-";
     for (size_t i = 0; i + 14 <= n; i++) {
@@ -295,15 +299,12 @@ static s2_pad *s2_pad_for(uint16_t pid) {   // a Joy-Con joins a pad that has th
             snprintf(cand, sizeof cand, "%02X:%02X:%02X:%02X:%02X:%02X", d[i + 8], d[i + 7], d[i + 6], d[i + 5], d[i + 4], d[i + 3]);
         }
     }
-    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB： %s真机记录 主机=%s； sentinel旧%s新%s； %s", n / 1024, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无", [self flashRegionReads:dump] ? "区域有数据" : "区域全空白（可能读错区）");
-    done();
+    snprintf(g_sw2_flash_status, sizeof g_sw2_flash_status, "Flash %zuKB（%s）： %s真机记录 主机=%s； sentinel旧%s新%s； %s", n / 1024, note, hostRec ? "有" : "无", cand, has1 ? "已落盘" : "无", has2 ? "已落盘" : "无", s2_flash_region_reads(d, n) ? "区域有数据" : "区域全空白（可能读错区）");
 }
 
-// erased flash reads back as FF (or sometimes 00): an entirely blank region means we are reading a place nothing ever wrote — wrong window, the pair record lives elsewhere
-- (BOOL)flashRegionReads:(NSData *)dump {
-    const uint8_t *d = dump.bytes; size_t n = dump.length;
-    for (size_t i = 0; i < n; i++) if (d[i] != 0xFF && d[i] != 0x00) return YES;
-    return NO;
+- (void)flashReport:(NSData *)dump done:(void (^)(void))done {
+    s2_flash_report(dump.bytes, dump.length, "完整扫描");
+    done();
 }
 
 // Sync is held on this controller (its advertisement named no host): give it this host's address and fresh keys, as the console does (switch2_proto.h, Bonding)
