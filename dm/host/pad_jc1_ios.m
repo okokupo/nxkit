@@ -26,7 +26,9 @@ static JC1Probe *g_jc1_probe;
     CBCentralManager *_cm;
     CBPeripheral *_per;
     NSMutableArray<CBCharacteristic *> *_reports;   // every 2A4D (HOGP names input and output report characteristics alike)
-    NSMutableDictionary<NSUUID *, NSString *> *_names;  // identifier -> best known advertised name
+    NSMutableDictionary<NSUUID *, NSString *> *_names;  // identifier -> advertised name (may be empty)
+    NSMutableDictionary<NSUUID *, NSNumber *> *_hid;    // identifier -> YES if advert carried HID 0x1812
+    NSMutableDictionary<NSUUID *, NSNumber *> *_rssi;   // identifier -> last RSSI
     int _advCount;   // every advert callback
     int _devCount;   // distinct devices seen
     int _nudgeCount;
@@ -39,6 +41,8 @@ static JC1Probe *g_jc1_probe;
     snprintf(g_jc1_last, sizeof g_jc1_last, "-");
     _reports = [NSMutableArray new];
     _names = [NSMutableDictionary new];
+    _hid = [NSMutableDictionary new];
+    _rssi = [NSMutableDictionary new];
     _advCount = 0;
     _devCount = 0;
     _nudgeCount = 0;
@@ -72,12 +76,19 @@ static JC1Probe *g_jc1_probe;
 - (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)per advertisementData:(NSDictionary<NSString *, id> *)adv RSSI:(NSNumber *)rssi {
     _advCount++;
     if (!_names[per.identifier]) _devCount++;
-    NSString *known = _names[per.identifier] ?: @"";
     NSString *name = per.name;
     if (name.length == 0) name = (NSString *)adv[CBAdvertisementDataLocalNameKey];
-    if (name.length && known.length == 0) { _names[per.identifier] = name; known = name; }
+    if (name.length == 0) name = @"";
+    _names[per.identifier] = name;                       // remember even if empty
+    NSArray *uuids = (NSArray *)adv[CBAdvertisementDataServiceUUIDsKey];
+    BOOL has1812 = NO;
+    for (CBUUID *u in uuids)
+        if ([u.UUIDString.lowercaseString isEqualToString:@"1812"]) { has1812 = YES; break; }
+    if (has1812) _hid[per.identifier] = @YES;
+    _rssi[per.identifier] = rssi;
     if (_per) return;   // already pursuing one
-    if (known.length >= 7 && [known hasPrefix:@"Joy-Con"]) {
+    NSString *known = name;
+    if (known.length >= 7 && [known.lowercaseString containsString:@"joy-con"]) {
         _per = per;
         _per.delegate = self;
         [_cm stopScan];
@@ -85,13 +96,26 @@ static JC1Probe *g_jc1_probe;
         [_cm connectPeripheral:per options:nil];
         return;
     }
-    // Live discovery feed: show what iOS actually reports so a silent filter can never hide the answer again.
+    if (has1812) {   // HID service in the advert itself: input device even without a usable name
+        _per = per;
+        _per.delegate = self;
+        [_cm stopScan];
+        snprintf(g_jc1_status, sizeof g_jc1_status, "发现 HID 设备（%@ dBm，名字\"%s\"），连接…", rssi, known.UTF8String);
+        [_cm connectPeripheral:per options:nil];
+        return;
+    }
+    // Live discovery feed: every device with name (or UUID stub) + RSSI + HID tag, so nothing hides.
     NSMutableArray<NSString *> *shown = [NSMutableArray new];
-    for (NSString *n in _names.allValues)
-        if (n.length && shown.count < 3) [shown addObject:[n substringToIndex:MIN(n.length, 12)]];
+    for (NSUUID *k in _names.allKeys) {
+        if (shown.count >= 4) break;
+        NSString *n = _names[k];
+        NSString *label = n.length ? [n substringToIndex:MIN(n.length, 12)] : [k.UUIDString substringToIndex:8];
+        NSString *tag = _hid[k] ? @" [HID]" : @"";
+        [shown addObject:[NSString stringWithFormat:@"%@(%@dBm)", [label stringByAppendingString:tag], _rssi[k]]];
+    }
     snprintf(g_jc1_status, sizeof g_jc1_status, "广播 %d 包 / %d 台：%s%s（找 Joy-Con…）",
-             _advCount, _devCount, shown.count ? [shown componentsJoinedByString:@", "].UTF8String : "（都还没名字）",
-             _devCount > 3 ? "…" : "");
+             _advCount, _devCount, shown.count ? [shown componentsJoinedByString:@" "].UTF8String : "（空）",
+             _devCount > 4 ? "…" : "");
 }
 
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)per {

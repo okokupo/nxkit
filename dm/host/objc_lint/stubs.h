@@ -36,6 +36,8 @@ void os_unfair_lock_unlock(os_unfair_lock *l);
 - (BOOL)hasPrefix:(NSString *)s;
 - (BOOL)hasSuffix:(NSString *)s;
 - (BOOL)containsString:(NSString *)s;
+- (NSString *)lowercaseString;
+- (NSString *)stringByAppendingString:(NSString *)s;
 - (BOOL)isEqualToString:(NSString *)s;
 - (NSString *)substringToIndex:(NSUInteger)i;
 - (NSString *)substringFromIndex:(NSUInteger)i;
