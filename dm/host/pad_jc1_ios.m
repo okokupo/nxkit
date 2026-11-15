@@ -96,12 +96,9 @@ static JC1Probe *g_jc1_probe;
         [_cm connectPeripheral:per options:nil];
         return;
     }
-    if (has1812) {   // HID service in the advert itself: input device even without a usable name
-        _per = per;
-        _per.delegate = self;
-        [_cm stopScan];
-        snprintf(g_jc1_status, sizeof g_jc1_status, "发现 HID 设备（%@ dBm，名字\"%s\"），连接…", rssi, known.UTF8String);
-        [_cm connectPeripheral:per options:nil];
+    if (has1812) {   // HID in the advert: mark it, but DON'T auto-connect — a bare-HID match could be
+                     // someone's keyboard/headset in range; wrong connects crash the stack (v3 闪退嫌疑)
+        snprintf(g_jc1_status, sizeof g_jc1_status, "发现无名 HID 设备（%@ dBm，名字\"%s\"）— 不自动连，等 Joy-Con 名字", rssi, known.UTF8String);
         return;
     }
     // Live discovery feed: every device with name (or UUID stub) + RSSI + HID tag, so nothing hides.

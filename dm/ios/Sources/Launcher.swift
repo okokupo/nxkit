@@ -265,7 +265,7 @@ private struct Switch2TestView: View {
                 Text(js.isEmpty ? "未启动" : js).font(.caption.monospaced()).foregroundStyle(.secondary)
                 HStack {
                     Button(dm_jc1_probe_running() == 1 ? "停止探针" : "启动探针") {
-                        if dm_jc1_probe_running() == 1 { dm_jc1_probe_stop() } else { dm_jc1_probe_start() }
+                        if dm_jc1_probe_running() == 1 { dm_jc1_probe_stop(); dm_switch2_scan_resume() } else { dm_switch2_scan_pause(); dm_jc1_probe_start() }
                     }
                     Spacer()
                     let cnt = tick >= 0 ? dm_jc1_probe_count() : 0
