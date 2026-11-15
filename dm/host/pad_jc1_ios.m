@@ -90,7 +90,7 @@ static JC1Probe *g_jc1_probe;
     for (NSString *n in _names.allValues)
         if (n.length && shown.count < 3) [shown addObject:[n substringToIndex:MIN(n.length, 12)]];
     snprintf(g_jc1_status, sizeof g_jc1_status, "广播 %d 包 / %d 台：%s%s（找 Joy-Con…）",
-             _advCount, _devCount, shown.count ? shown.componentsJoinedByString(@", ").UTF8String : "（都还没名字）",
+             _advCount, _devCount, shown.count ? [shown componentsJoinedByString:@", "].UTF8String : "（都还没名字）",
              _devCount > 3 ? "…" : "");
 }
 
