@@ -21,6 +21,16 @@ int dm_switch2_scan_pause(void);              // pad_switch2_apple.m: stop disco
 void dm_switch2_scan_resume(void);            // pad_switch2_apple.m: restart discovery (test view's 应用 button and page exit)
 const char *dm_switch2_info_status(void);    // pad_switch2_apple.m: what the 0x13000 info block showed (the pad saw our real radio address — did it record it?)
 
+// Joy-Con (1st generation) direct BLE probe (pad_jc1_ios.m): does an app-level CoreBluetooth connection get HID reports
+// (service 0x1812, characteristic 0x2A4D) without the system claiming the pad? Reports flowing = the Mac parsing
+// (pad_jc1.h) can sit on top of this transport for iOS.
+void dm_jc1_probe_start(void);   // scan → connect → subscribe (pad must not be paired in iOS Settings)
+void dm_jc1_probe_stop(void);
+const char *dm_jc1_probe_status(void);   // live progress for the test view
+const char *dm_jc1_probe_last(void);   // hex dump of the latest report
+int dm_jc1_probe_count(void);
+int dm_jc1_probe_running(void);
+
 // Switch 2 test view (Launcher.swift): a flat pad snapshot so Swift needs no C struct access
 typedef struct dm_s2_test_row { unsigned pid, buttons; unsigned short lx, ly, rx, ry, battery_mv; } dm_s2_test_row;
 int dm_switch2_test_rows(dm_s2_test_row *out, int cap);   // DmGamepad.m: fills up to cap rows, returns the pad count

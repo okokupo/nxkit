@@ -260,6 +260,22 @@ private struct Switch2TestView: View {
                 let ix = tick >= 0 ? String(cString: dm_switch2_info_status()) : ""
                 Text(ix.isEmpty ? "Info 区未读" : ix).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
+            Section(footer: Text("一代 Joy-Con 请勿在 iOS 设置里配对（系统会独占它）；设置里已有的配对先删除。按住 Sync 直到灯效扫动，探针会自动发现并连接。判据：报表能流入 = 一代 Joy-Con 在 iPad 上有戏（Mac 端解析可直接搬）；订阅失败/无数据 = 路线死。")) {
+                let js = tick >= 0 ? String(cString: dm_jc1_probe_status()) : ""
+                Text(js.isEmpty ? "未启动" : js).font(.caption.monospaced()).foregroundStyle(.secondary)
+                HStack {
+                    Button(dm_jc1_probe_running() == 1 ? "停止探针" : "启动探针") {
+                        if dm_jc1_probe_running() == 1 { dm_jc1_probe_stop() } else { dm_jc1_probe_start() }
+                    }
+                    Spacer()
+                    let cnt = tick >= 0 ? dm_jc1_probe_count() : 0
+                    Text("报表 \(cnt) 条").font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                let last = tick >= 0 ? String(cString: dm_jc1_probe_last()) : ""
+                if last != "-" {
+                    Text(last).font(.caption2.monospaced()).foregroundStyle(.secondary)
+                }
+            }
             Section(footer: Text("此页打开时本机自动广播为 DmIOS-host：用安卓 nRF Connect 扫描，抄下它的蓝牙地址填进来。iOS 隐藏本机地址，而手柄唤醒广播只发给它存的地址——填真实地址本机才能收到。应用后：按住 Sync 重配对 → 杀App重开 → 按任意键。")) {
                 Text("本机广播：\(HostAdvertBox.shared.status) / isAdvertising=\(HostAdvertBox.shared.advertising ? "是" : "否")").font(.caption.monospaced()).foregroundStyle(.secondary)
                 HStack {
