@@ -26,6 +26,9 @@ static JC1Probe *g_jc1_probe;
     CBCentralManager *_cm;
     CBPeripheral *_per;
     NSMutableArray<CBCharacteristic *> *_reports;   // every 2A4D (HOGP names input and output report characteristics alike)
+    NSMutableDictionary<NSUUID *, NSString *> *_names;  // identifier -> best known advertised name
+    int _advCount;   // every advert callback
+    int _devCount;   // distinct devices seen
     int _nudgeCount;
     BOOL _nudged;
 }
@@ -35,6 +38,9 @@ static JC1Probe *g_jc1_probe;
     g_jc1_count = 0;
     snprintf(g_jc1_last, sizeof g_jc1_last, "-");
     _reports = [NSMutableArray new];
+    _names = [NSMutableDictionary new];
+    _advCount = 0;
+    _devCount = 0;
     _nudgeCount = 0;
     _nudged = NO;
     g_jc1_running = 1;
@@ -57,21 +63,35 @@ static JC1Probe *g_jc1_probe;
         if (g_jc1_running) snprintf(g_jc1_status, sizeof g_jc1_status, "蓝牙不可用（状态 %ld）", (long)central.state);
         return;
     }
-    [_cm scanForPeripheralsWithServices:nil options:@{CBCentralManagerScanOptionAllowDuplicatesKey: @NO}];
-    snprintf(g_jc1_status, sizeof g_jc1_status, "扫描 Joy-Con 广播…（按住手柄顶部 Sync 键进入配对）");
+    // AllowDuplicates is mandatory: the first report often carries no local name (it lives in the scan response),
+    // and with duplicate filtering on we would drop the pad forever after one unnamed sighting — the exact bug v1 had.
+    [_cm scanForPeripheralsWithServices:nil options:@{CBCentralManagerScanOptionAllowDuplicatesKey: @YES}];
+    snprintf(g_jc1_status, sizeof g_jc1_status, "扫描所有广播…（按住手柄顶部 Sync 键进入配对）");
 }
 
 - (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)per advertisementData:(NSDictionary<NSString *, id> *)adv RSSI:(NSNumber *)rssi {
+    _advCount++;
+    if (!_names[per.identifier]) _devCount++;
+    NSString *known = _names[per.identifier] ?: @"";
     NSString *name = per.name;
     if (name.length == 0) name = (NSString *)adv[CBAdvertisementDataLocalNameKey];
-    if (name.length == 0) return;
-    if (![name hasPrefix:@"Joy-Con"]) return;
+    if (name.length && known.length == 0) { _names[per.identifier] = name; known = name; }
     if (_per) return;   // already pursuing one
-    _per = per;
-    _per.delegate = self;
-    [_cm stopScan];
-    snprintf(g_jc1_status, sizeof g_jc1_status, "发现 %s（%@ dBm），连接…", name.UTF8String, rssi);
-    [_cm connectPeripheral:per options:nil];
+    if (known.length >= 7 && [known hasPrefix:@"Joy-Con"]) {
+        _per = per;
+        _per.delegate = self;
+        [_cm stopScan];
+        snprintf(g_jc1_status, sizeof g_jc1_status, "发现 %s（%@ dBm），连接…", known.UTF8String, rssi);
+        [_cm connectPeripheral:per options:nil];
+        return;
+    }
+    // Live discovery feed: show what iOS actually reports so a silent filter can never hide the answer again.
+    NSMutableArray<NSString *> *shown = [NSMutableArray new];
+    for (NSString *n in _names.allValues)
+        if (n.length && shown.count < 3) [shown addObject:[n substringToIndex:MIN(n.length, 12)]];
+    snprintf(g_jc1_status, sizeof g_jc1_status, "广播 %d 包 / %d 台：%s%s（找 Joy-Con…）",
+             _advCount, _devCount, shown.count ? shown.componentsJoinedByString(@", ").UTF8String : "（都还没名字）",
+             _devCount > 3 ? "…" : "");
 }
 
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)per {
