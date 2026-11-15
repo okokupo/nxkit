@@ -38,6 +38,7 @@ void os_unfair_lock_unlock(os_unfair_lock *l);
 - (BOOL)containsString:(NSString *)s;
 - (NSString *)lowercaseString;
 - (NSString *)stringByAppendingString:(NSString *)s;
+- (NSString *)stringByAppendingPathComponent:(NSString *)s;
 - (BOOL)isEqualToString:(NSString *)s;
 - (NSString *)substringToIndex:(NSUInteger)i;
 - (NSString *)substringFromIndex:(NSUInteger)i;
@@ -136,6 +137,23 @@ dispatch_queue_t dispatch_get_main_queue(void);
 - (void)addObject:(id)o;
 - (void)removeAllObjects;
 - (BOOL)containsObject:(id)o;
+@end
+
+// ---- crash capture support ----
+@interface NSException : NSObject
+@property (readonly, copy) NSString *name;
+@property (readonly, copy) NSString *reason;
+@end
+typedef void (*NSUncaughtExceptionHandler)(NSException *exception);
+void NSSetUncaughtExceptionHandler(NSUncaughtExceptionHandler h);
+typedef int NSSearchPathDirectory;
+typedef unsigned long NSSearchPathDomainMask;
+extern const NSSearchPathDirectory NSApplicationSupportDirectory;
+extern const NSSearchPathDomainMask NSUserDomainMask;
+NSArray *NSSearchPathForDirectoriesInDomains(NSSearchPathDirectory d, NSSearchPathDomainMask m, BOOL expand);
+@interface NSFileManager : NSObject
++ (NSFileManager *)defaultManager;
+- (BOOL)createDirectoryAtPath:(NSString *)path withIntermediateDirectories:(BOOL)flag attributes:(NSDictionary *)attrs error:(NSError **)err;
 @end
 
 // ---- CoreBluetooth ----
