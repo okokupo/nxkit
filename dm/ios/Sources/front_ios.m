@@ -298,6 +298,13 @@ bool dm_setting_live(const char *env, const char *value) {
         if (value) LOG("front end: cheat %s = %s (the game picks it up within seconds)", env, value);
         return true;
     }
+    if (!strcmp(env, "DM_SEASON_NUM")) {
+        // The in-game season picker (settings.tsv choice row behind fixups:DM_CHEATS): the same reloader path
+        // refreshes it — the dispatcher re-reads DM_SEASON_NUM on the next wrap and rewrites the runtime season
+        // slot (bss 0x1A482C8+7) the Season::Num()/season_created/bootstrap sites read. New heroes only.
+        if (value) LOG("front end: season num %s (new-season heroes pick it up within seconds)", value);
+        return true;
+    }
     return false;
 }
 @interface DmTVSceneDelegate : UIResponder <UIWindowSceneDelegate>
@@ -450,7 +457,10 @@ int front_text_input(const char *title, const char *sub, const char *guide, cons
     if (!g_layer) return -1;
     __block int r = 0; __block NSString *text = nil;
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
-    NSString *t = title && *title ? @(title) : @"", *m = [NSString stringWithFormat:@"%s%s%s", sub ? sub : "", sub && *sub && guide && *guide ? "\n" : "", guide ? guide : ""];
+    NSString *t = title && *title ? @(title) : @"", *sub_s = sub ? @(sub) : @"", *guide_s = guide ? @(guide) : @"";
+    // %@ with boxed strings: the message can be UTF-8 (the games' guides are), which %s would read byte-wise
+    // in the system's 8-bit encoding and garble (Chen 17:31); the title/initial/placeholder box with @() and stay readable
+    NSString *m = [NSString stringWithFormat:@"%@%@%@", sub_s, sub && *sub && guide && *guide ? @"\n" : @"", guide_s];
     NSString *init = initial ? @(initial) : @"", *ph = guide ? @(guide) : @"";
     dispatch_async(dispatch_get_main_queue(), ^{
         UIAlertController *ac = [UIAlertController alertControllerWithTitle:t message:m preferredStyle:UIAlertControllerStyleAlert];

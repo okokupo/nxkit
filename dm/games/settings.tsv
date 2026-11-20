@@ -54,3 +54,4 @@ DM_CHEAT_LEVEL	toggle	-	0	fixups:DM_CHEATS	Game	升级	大秘境升级必满级�
 DM_CHEAT_DROP	toggle	-	0	fixups:DM_CHEATS	Game	掉落	远古/传奇掉率 100%、赛季专属掉落、牧牛杖等 9 站
 DM_CHEAT_WAR	toggle	-	0	fixups:DM_CHEATS	Game	无敌	无限血/蓝、一击必杀、技能无冷却、伤害×1亿 —— 15 站
 DM_CHEAT_RES	toggle	-	0	fixups:DM_CHEATS	Game	资源	金币/血岩碎片/材料锁定不减 —— 2 站
+DM_SEASON_NUM	choice	14=Season 14,15=Season 15,16=Season 16,17=Season 17,18=Season 18,19=Season 19,20=Season 20,21=Season 21,22=Season 22,24=Season 24,25=Season 25,26=Season 26,27=Season 27,28=Season 28,29=Season 29,30=Season 30,31=Season 31,32=Season 32,33=Season 33,34=Season 34,35=Season 35,36=Season 36,37=Season 37	30	fixups:DM_CHEATS	Game	赛季号	作用于新建赛季角色
