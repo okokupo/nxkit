@@ -49,3 +49,8 @@ DM_PSO_PREBUILD	toggle	-	1	gfxapi:nvn	Performance	Pipeline prebuild	The first st
 DM_NVN_ENC_THREAD	toggle	-	1|DM_GAME_ENC_THREAD	gfxapi:nvn	Performance	Encode thread
 DM_FPS_HOLD	toggle	on/off	DM_GAME_FPS_HOLD	DM_GAME_FPS_TARGET!=0	Performance	Hold frames when late
 DM_METAL_HUD	toggle	-	0	always	Performance	Performance HUD
+DM_CHEAT_QOL	toggle	-	0	fixups:DM_CHEATS	Game	便利	快速鉴定/制作/附魔、魔盒免材料、宝石满级、自动拾取金币材料、快速回城等 17 站
+DM_CHEAT_LEVEL	toggle	-	0	fixups:DM_CHEATS	Game	升级	大秘境升级必满级、层数直达 150、暴击 3100% —— 3 站
+DM_CHEAT_DROP	toggle	-	0	fixups:DM_CHEATS	Game	掉落	远古/传奇掉率 100%、赛季专属掉落、牧牛杖等 9 站
+DM_CHEAT_WAR	toggle	-	0	fixups:DM_CHEATS	Game	无敌	无限血/蓝、一击必杀、技能无冷却、伤害×1亿 —— 15 站
+DM_CHEAT_RES	toggle	-	0	fixups:DM_CHEATS	Game	资源	金币/血岩碎片/材料锁定不减 —— 2 站

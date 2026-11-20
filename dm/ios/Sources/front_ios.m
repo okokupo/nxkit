@@ -290,6 +290,14 @@ bool dm_setting_live(const char *env, const char *value) {
     if (!strcmp(env, "DM_TOUCH_HAPTICS")) { if (value) dm_gamepad_touch_feedback(atoi(value) != 0); return true; }
     if (!strcmp(env, "DM_RUMBLE")) { if (value) { dm_haptics_set_enabled(atoi(value) != 0); LOG("front end: game rumble %s (in-game menu)", atoi(value) ? "on" : "off"); } return true; }
     if (!strncmp(env, "DM_SW2_GL_", 9) || !strncmp(env, "DM_SW2_GR_", 9)) { if (value) dm_switch2_paddle_live(env, value); return true; }   // the Switch 2 back paddles (the NULL query only lists them)
+    if (!strncmp(env, "DM_CHEAT_", 9)) {
+        // In-game gear-menu toggles (settings.tsv rows behind fixups:DM_CHEATS). LauncherSettings.choose has
+        // already putenv'd the new value; the guest picks it up within seconds: the input-poll reloaders
+        // (dm/games/01001B300B9BE000/patches.py) re-read DM_CHEAT_* every 128 GetNpadStates calls and refresh
+        // the engine flags, so the switch takes effect while the game runs (no restart).
+        if (value) LOG("front end: cheat %s = %s (the game picks it up within seconds)", env, value);
+        return true;
+    }
     return false;
 }
 @interface DmTVSceneDelegate : UIResponder <UIWindowSceneDelegate>
