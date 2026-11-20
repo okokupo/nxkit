@@ -79,6 +79,9 @@ else:
 # (a game's own modules: its profile's builds). Every file is loaded, whatever the game, so a module gets the patches of its build wherever it comes from; a build ID claimed twice stops the rewrite.
 # A file may define:
 #   CUTS = {build ID: [(offset, original bytes, new bytes, reason)]}: before rewriting, the original bytes are asserted one by one and any mismatch aborts (listed in <name>.cuts.tsv)
+#   PATCH_AREA_CUTS = {build ID: [(guest offset, zero bytes, new bytes, reason)]}: writes into the patch area AFTER every stub the rewriter itself emitted, applied only to a near
+#     module; each range must still be zero there (an overlap with the rewrite's own output aborts), the entries are listed in <name>.cuts.tsv, and a build with any entry gets the
+#     '# DM_CHEATS 1' fixups key (settings.tsv rows gated on fixups:DM_CHEATS). D3 2.7.7's cheat stubs (46 stations + dispatcher + input-poll reloaders) live at 0x1ADB800..
 #   OBS = {build ID: [(offset, number, original instruction word, reason)]}: observation gates. Numbers match OBS_* in the host's hle.h; the original instruction must be position
 #     independent (no PC-relative / branch / anything involving x18 or tpidr), asserted offline; when the host has no callback attached the gate block goes in and out once and returns
 #   FRAME_STEP = {build ID: function(ctx)}: the frame step stubs of a main ("Frame step in whole vsyncs" below)
@@ -108,7 +111,7 @@ patch_paths = {}
 for path in PATCH_FILES: patch_paths.setdefault(os.path.realpath(path), path)   # repeated roots and symlinks name the same file, not competing build claims
 PATCH_FILES = list(patch_paths.values())
 def load_patches():
-    tables, where = {'CUTS': {}, 'OBS': {}, 'FRAME_STEP': {}, 'MATCH_CUTS': {}, 'MATCH_FRAME_STEP': {}, 'SDK_MATCH_CUTS': {}, 'CAPABILITIES': {}}, {}
+    tables, where = {'CUTS': {}, 'OBS': {}, 'FRAME_STEP': {}, 'MATCH_CUTS': {}, 'MATCH_FRAME_STEP': {}, 'SDK_MATCH_CUTS': {}, 'CAPABILITIES': {}, 'PATCH_AREA_CUTS': {}}, {}
     for n, path in enumerate(PATCH_FILES):
         spec = importlib.util.spec_from_file_location(f'patches_{n}', path); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
         for kind, table in tables.items():
@@ -1903,6 +1906,21 @@ for g in spin_regions: spin_emit(g)
 if os.environ.get('DM_SPIN_LIST'):
     for T, bes, n in spin_sites: print(f'{NAME} spin wait {T:#x} ({n} instructions), back-edges ' + ' '.join(f'{b:#x}' for b in bes))
 
+# PATCH_AREA_CUTS of the patch files (restricted by NSO build ID): writes into the patch area AFTER every stub the
+# rewriter itself emitted, so each range must still be zero there (D3 2.7.7's cheat stubs live in the measured-free
+# tail 0x1ADB800.., far past the rewrite's own usage). The assertion turns any growth of that usage into an abort
+# instead of a silent overlap. Only a near module (the default): FAR/TWO place stubs differently and are not offered.
+for off, ob, nb, why in PATCHES['PATCH_AREA_CUTS'].get(BUILD_ID, []):
+    ob, nb = bytes.fromhex(ob), bytes.fromhex(nb)
+    a = off - PATCH_OFF
+    assert len(ob) == len(nb), f'patch area cut {off:#x}: old/new length differ'
+    assert not (FAR or TWO) and a >= 0, f'patch area cut {off:#x}: only a near module is supported'
+    if len(patch_front) < a + len(ob): patch_front.extend(bytes(a + len(ob) - len(patch_front)))
+    assert not any(patch_front[a:a + len(ob)]), f'patch area cut {off:#x} ({why}) overlaps the rewriter\'s own output'
+    patch_front[a:a + len(ob)] = nb
+    cuts.append((off, ob.hex(), nb.hex(), why))
+AREA_CUT_KEYS = sorted(PATCHES['PATCH_AREA_CUTS'])
+
 os.makedirs(outdir, exist_ok=True)
 P = lambda ext: os.path.join(outdir, f'{NAME}.{ext}')
 patch = patch_front
@@ -1931,6 +1949,7 @@ with open(P('fixups.tsv'), 'w') as f:
     if FS_STATE_OFF: f.write(f'# FPS_STATE_OFF\t{FS_STATE_OFF:#x}\n')   # frame step state page (FRAME_STEP): the loader writes the target fps there
     if UE_CALLS: f.write(f'# UE_MALLOC_VT\t{UE_VT:#x}\n# UE_MALLOC_SLOT\t{UE_SLOT:#x}\n')   # Unreal's FMallocBinned3 (ue_malloc.py): its vtable and the slot of its name getter, which names the slot layout
     if FPS_TARGET_PTR is not None: f.write(f'# FPS_TARGET_PTR\t{FPS_TARGET_PTR:#x}\n# FPS_TARGET_FIELD\t{FPS_TARGET_FIELD:#x}\n')   # a target frame rate the game steps by (fps_target.py)
+    if BUILD_ID in AREA_CUT_KEYS: f.write(f'# DM_CHEATS\t1\n')   # patch-area cuts applied (D3 cheats): settings.tsv rows gated on fixups:DM_CHEATS
     if UE_FIXED_PTR is not None: f.write(f'# UE_FIXED_RATE_PTR\t{UE_FIXED_PTR:#x}\n# UE_FIXED_RATE_FIELD\t{UE_FIXED_FIELD:#x}\n# UE_FIXED_RATE_FLAG\t{UE_FIXED_FLAG:#x}\n')   # Unreal's GEngine, UEngine::FixedFrameRate and bUseFixedFrameRate (ue_fixed_rate.py)
     if 'target' in UNITY_FPS: f.write(f"# UNITY_TARGET_FPS\t{UNITY_FPS['target']:#x}\n")   # Unity's Application.targetFrameRate (unity_fps.py)
     if 'qs' in UNITY_FPS: f.write(''.join(f'# UNITY_QS_{k}\t{v:#x}\n' for k, v in zip(('PTR', 'IDX', 'ARR', 'SIZE', 'VSYNC'), UNITY_FPS['qs'])))   # its QualitySettings' vSyncCount (unity_fps.py)
