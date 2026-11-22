@@ -20,7 +20,7 @@
 # sees it: XVar num/state = host menu slots (+7/+6 of the flag base, defaults 30/1), the initialized flag, the
 # service-available gate, and seasons OverrideEnabled. Idempotent re-write on every call (aligned u32 stores are
 # atomic; C++ static construction is guaranteed done because the trigger IS an XVar read). The create-flow gates
-# (0x351CC4 UI, 0x61668 offline-true branch, 0x1BF5F0/94 ValidateHero) are point cuts; season_created (0x1BD140)
+# (0x351CC4 UI, 0x61668 offline-true branch, 0x1BF5F0/94 ValidateHero, 0x56B10/14 sign-in always true) are point cuts; season_created (0x1BD140)
 # and the spawn tbz (0x4CADB8) stay ORIGINAL - the hero's own data drives them. The journey detail opener
 # (0x172C40) is neutered to ret: the journey data chain is server-fed dynamic objects and would NULL-crash
 # (v6 evidence: 0x172d48); a later round can fake the container. World content itself is local SNO (the stock
@@ -92,6 +92,8 @@ CUTS = {
         (0x351cc4, '08615a39', '28008052', 'season v10: ldrb w8,[x8,#0x698] -> movz w8,#1, bSeasonConfirmedAvailable always true (d3hack 03)'),
         (0x61668, '28010034', '09000014', 'season v10: cbz w8,#0x24 -> b 0x6168c, IsSeasonAvailable takes the offline (true) path regardless of IsSignedInOnline - avoids the [0xc90] vtable deref the v7 signin spoof would walk into'),
         (0x1bf5f0, 'ff0304d1', '00008052', 'season v10: sub sp,sp,#0x100 -> movz w0,#0, ValidateHeroForPartyMember returns error_none (d3hack 08)'),
+        (0x56b10, 'f44fbea9', '20008052', 'season v14: stp x20,x19,[sp,#-0x20]! -> movz w0,#1, IsSignedInOnline always true (d3hack signin 01; 2.7.7 verified). v10-v13 created seasonal heroes into "not connected" because the creation confirm flow checks sign-in state; 0x61668 above is its companion (skips the [0xc90] virtual query a spoofed-online IsSeasonAvailable would dereference empty)'),
+        (0x56b14, 'fd7b01a9', 'c0035fd6', 'season v14: stp x29,x30,[sp,#0x10] -> ret, with the row above (d3hack signin 02)'),
         (0x1bf5f4, 'f76300f9', 'c0035fd6', 'season v10: str x23,[sp,#0xc0] -> ret, pair of the movz above (d3hack 09)'),
         (0x172c40, 'ffc302d1', 'c0035fd6', 'season v10: journey detail opener -> ret, the journey data chain is server-fed and NULL-crashes offline (v6: 0x172d48); click is a no-op until a later round fakes the container'),
         (0x72e090, 'e0500090', '60b74e14', 'season v10: adrp x0 -> b lazy-init stub_A 0x1ADBE10 (presets XVar num/state, init flag, service gate, OverrideEnabled, then replays adrp x0 and falls into the original ldr/b)'),
