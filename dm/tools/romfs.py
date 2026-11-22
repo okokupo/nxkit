@@ -129,7 +129,11 @@ class _File(io.RawIOBase):
         self.pos = pos; return pos
     def readinto(self, buffer):
         size = min(len(buffer), max(0, self.length - self.pos))
-        data = _os.pread(self.fd, size, self.start + self.pos)
+        if hasattr(_os, 'pread'):
+            data = _os.pread(self.fd, size, self.start + self.pos)
+        else:   # Windows: no pread; this fd is owned by this instance, so lseek+read is equivalent
+            _os.lseek(self.fd, self.start + self.pos, _os.SEEK_SET)
+            data = _os.read(self.fd, size)
         buffer[:len(data)] = data; self.pos += len(data)
         return len(data)
     def close(self):
