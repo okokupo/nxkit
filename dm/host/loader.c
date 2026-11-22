@@ -832,6 +832,35 @@ static void map_image(module_t *m, const char *dir) {
 static char g_module_dir[1024];   // the folder the modules were loaded from (dm_module_dir)
 const char *dm_module_dir(void) { return g_module_dir; }
 
+#if DM_GAME_PROGRAM_ID == 0x01001B300B9BE000ull
+// v6 (Diablo III 2.7.7): the engine cheat flags and the runtime season, written straight into main's bss slot
+// 0x1A482C8 (+1..+5 the QOL/LEVEL/DROP/WAR/RES groups, +7 the season). Up to v5 a patch-area dispatcher read them
+// with getenv on the guest side, but the guest's musl environ is empty (v5diag: six g_getenv NULL) and its 7th
+// re-entrant call crashed at pc=main+0x1adbef0, so that whole chain is cut from patches.py. The host reads the same
+// DM_CHEAT_*/DM_SEASON_NUM values from its own environment (launcher settings.tsv rows / Documents/env.txt) and
+// writes the bytes the 46 mini-stubs and Season::Num()/season_created/bootstrap read. Called from dm_main after
+// relocation (before nnMain) and again on every gear-menu toggle (front_ios.m dm_setting_live, after the launcher
+// putenv'd the new value), so switches are hot with no guest-side polling.
+void dm_d3_flags_write(void) {
+    for (int i = 0; i < g_nmod; i++) {
+        module_t *m = &g_mod[i];
+        if (strcmp(m->name, "main") || !m->loaded) continue;
+        if (m->size < 0x1A482D0) return;
+        uint8_t *f = (uint8_t *)m->base + 0x1A48000;
+        static const char *const envs[5] = {"DM_CHEAT_QOL", "DM_CHEAT_LEVEL", "DM_CHEAT_DROP", "DM_CHEAT_WAR", "DM_CHEAT_RES"};
+        for (int j = 0; j < 5; j++) { const char *e = getenv(envs[j]); f[0x2C9 + j] = (uint8_t)(e && atoi(e) ? 1 : 0); }
+        const char *s = getenv("DM_SEASON_NUM");
+        int sn = s ? atoi(s) : 0;
+        f[0x2CF] = (uint8_t)(sn > 0 && sn < 256 ? sn : 30);
+        LOG("d3 flags: qol=%d level=%d drop=%d war=%d res=%d season=%d (host direct-write at %p)",
+            f[0x2C9], f[0x2CA], f[0x2CB], f[0x2CC], f[0x2CD], f[0x2CF], (void *)(f + 0x2C8));
+        return;
+    }
+}
+#else
+void dm_d3_flags_write(void) {}
+#endif
+
 void load_modules(const char *dir, const char **names, int n) {
     strlcpy(g_module_dir, dir, sizeof g_module_dir);
     // Map everything and parse the symbol tables first, then relocate all at once (cross-module symbols must all be in place first)

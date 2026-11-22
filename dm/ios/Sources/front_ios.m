@@ -292,17 +292,17 @@ bool dm_setting_live(const char *env, const char *value) {
     if (!strncmp(env, "DM_SW2_GL_", 9) || !strncmp(env, "DM_SW2_GR_", 9)) { if (value) dm_switch2_paddle_live(env, value); return true; }   // the Switch 2 back paddles (the NULL query only lists them)
     if (!strncmp(env, "DM_CHEAT_", 9)) {
         // In-game gear-menu toggles (settings.tsv rows behind fixups:DM_CHEATS). LauncherSettings.choose has
-        // already putenv'd the new value; the guest picks it up within seconds: the input-poll reloaders
-        // (dm/games/01001B300B9BE000/patches.py) re-read DM_CHEAT_* every 128 GetNpadStates calls and refresh
-        // the engine flags, so the switch takes effect while the game runs (no restart).
-        if (value) LOG("front end: cheat %s = %s (the game picks it up within seconds)", env, value);
+        // already putenv'd the new value; v6 writes the engine flag bytes straight into main's bss slot 0x1A482C8+1..+5
+        // (dm_d3_flags_write, loader.c) — the patch-area getenv dispatcher is gone, so the switch takes effect at once,
+        // no guest-side polling.
+        if (value) { dm_d3_flags_write(); LOG("front end: cheat %s = %s (engine flags written)", env, value); }
         return true;
     }
     if (!strcmp(env, "DM_SEASON_NUM")) {
-        // The in-game season picker (settings.tsv choice row behind fixups:DM_CHEATS): the same reloader path
-        // refreshes it — the dispatcher re-reads DM_SEASON_NUM on the next wrap and rewrites the runtime season
-        // slot (bss 0x1A482C8+7) the Season::Num()/season_created/bootstrap sites read. New heroes only.
-        if (value) LOG("front end: season num %s (new-season heroes pick it up within seconds)", value);
+        // The in-game season picker (settings.tsv choice row behind fixups:DM_CHEATS): the same host direct write
+        // puts the number into the runtime season slot (bss 0x1A482C8+7) that Season::Num()/season_created/bootstrap
+        // read. New heroes only.
+        if (value) { dm_d3_flags_write(); LOG("front end: season num %s (season slot written)", value); }
         return true;
     }
     return false;

@@ -85,6 +85,7 @@ typedef struct {
 } module_t;
 
 extern module_t *g_mod;         // allocated once from the NSO list and NRO manifest; module addresses stay stable
+void dm_d3_flags_write(void);   // v6 (Diablo III 01001B300B9BE000): write the engine cheat flags + runtime season into main's bss slot 0x1A482C8 from the host environment (loader.c; empty unless this build is the game)
 extern int g_nmod;
 // main's build ID (empty if none): code with fixed addresses in a game's module runs only on the build they were found in
 static inline const char *dm_main_build(void) { for (int i = 0; i < g_nmod; i++) if (!strcmp(g_mod[i].name, "main")) return g_mod[i].build_id; return ""; }
