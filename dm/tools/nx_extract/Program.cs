@@ -77,7 +77,9 @@ static class P {
         if (a[1] == "--aoc") return Aoc(ks, a[2], a[3], image, a.Length > 4 ? Convert.ToUInt64(a[4], 16) : null);
         // each by its own content meta: a merged package (base game + update + DLC in one NSP, a cartridge dump with its update) is given as both the base game and the update,
         // and the base game's Program NCA and the update's have the same title ID, so without the filter the update would be layered on itself or on the wrong base
-        var basePkg = OpenNsp(ks, a[1], ContentMetaType.Application, app); var updPkg = a[2] == "-" ? null : OpenNsp(ks, a[2], ContentMetaType.Patch, app | 0x800);
+        var basePkg = OpenNsp(ks, a[1], ContentMetaType.Application, app); bool patchAlone = basePkg == null || basePkg.Count == 0;
+        if (patchAlone) basePkg = OpenNsp(ks, a[1], ContentMetaType.Patch, (app ?? 0) | 0x800);   // update-only package: read its Program NCA alone (a patch NCA's Code section is whole; d3hack port, 2026-11-19)
+        var updPkg = a[2] == "-" ? null : OpenNsp(ks, a[2], ContentMetaType.Patch, app | 0x800);
         if (list) {
             foreach (var (what, pkg) in new[] { ("base", basePkg), ("update", updPkg) })
                 if (pkg != null) foreach (Nca n in pkg) Console.WriteLine($"{what} {n.Header.ContentType} {n.Header.TitleId:x16}");
@@ -113,7 +115,7 @@ static class P {
             Console.WriteLine($"{k} HtmlDocument NCAs");
             return Damaged();
         }
-        Nca updProg = updPkg == null ? null : Pick(updPkg, NcaContentType.Program, baseProg.Header.TitleId) ?? throw new Exception("no Program NCA of the base game's program in the update NSP");
+        Nca updProg = patchAlone || updPkg == null ? null : Pick(updPkg, NcaContentType.Program, baseProg.Header.TitleId) ?? throw new Exception("no Program NCA of the base game's program in the update NSP");
         Nca ctrl = Pick(updPkg ?? basePkg, NcaContentType.Control, baseProg.Header.TitleId);
         Console.WriteLine($"title {baseProg.Header.TitleId:x16}" + (updProg != null ? $", update {updProg.Header.TitleId:x16}" : ""));
         string outDir = a[3], cmpDir = a.Length > 4 ? a[4] : null;

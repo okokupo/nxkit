@@ -741,8 +741,8 @@ def in_parallel(fn, jobs):
     start first). So SIGTERM stays blocked across the fork, which keeps it pending in the kernel, until a worker has the default action back and that action can end it.
     In this process it acts only while waiting for the results: the handler's sys.exit raised during the pool's teardown could stop a terminate halfway and leave workers behind, or be discarded
     in a destructor."""
-    if WORKERS < 2 or len(jobs) < 2:
-        return [fn(*job) for job in jobs]
+    if WORKERS < 2 or len(jobs) < 2 or not hasattr(signal, 'pthread_sigmask') or 'fork' not in multiprocessing.get_all_start_methods():
+        return [fn(*job) for job in jobs]   # Windows: no pthread_sigmask/fork; serial fallback (slower, same result)
     def worker_signals():
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})
