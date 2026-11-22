@@ -28,19 +28,20 @@ RET, NOP = "c0035fd6", "1f2003d5"
 CUTS = {
     '2607a74f5df7754cc0357b5df7e49693': [
         (0x351cc4, '08615a39', '28008052', 'season: ldrb w8,[x8,#0x698] -> movz w8,#1, bSeasonConfirmedAvailable always true (d3hack 03, reg W8 on 2.7.7)'),
-        (0x5ff0c, '00010012', '20008052', 'season: and w0,w8,#1 -> movz w0,#1, IsSeasonsInitialized always true (d3hack 04)'),
         (0x1bd140, '159140b9', 'a8796494', 'season: ldr w21,[x8,#0x90] -> BL slot reader 0x1ADB7E0, season_created reads the runtime season slot (bss 0x1A482C8+7)'),
         (0x1bf5f0, 'ff0304d1', '00008052', 'season: sub sp,sp,#0x100 -> movz w0,#0, ValidateHeroForPartyMember returns error_none (d3hack 08)'),
         (0x1bf5f4, 'f76300f9', 'c0035fd6', 'season: str x23,[sp,#0xc0] -> ret, with the stub above (d3hack 09)'),
         (0x4cadb8, 'a8009036', 'a8009036', 'season: tbz w8,#0x12 restored in v7 (nop forced every hero load down the seasonal branch and hung v2 eternal saves at the loading screen; d3hack keeps station 10 disarmed by default - seasonal create now relies on the UI setting dwCreationFlags bit 18, like stock online play)'),
-        (0x72e090, 'e0500090', 'c09800d0', 'season: adrp x0 -> adrp x0, bss flag/season page (Season::Num reads the runtime slot)'),
-        (0x72e094, '003046f9', '003c4b39', 'season: ldr x0,[x0,#0xc60] -> ldrb w0,[x0,#0x2cf], Season::Num() returns the season slot'),
-        (0x72e098, 'f6e40b14', 'c0035fd6', 'season: b XVarU32 getter tail -> ret, closes the 3-word Season::Num() slot stub (reads bss 0x1A482C8+7)'),
-        (0x72e0a0, 'e0500090', '20008052', 'season: adrp x0 -> movz w0,#1, Season::State() returns 1/active'),
-        (0x72e0a4, '003446f9', 'c0035fd6', 'season: ldr x0,[x0,#0xc68] -> ret, tail of Season::State() stub'),
-        (0x600b8, 'e103152a', 'cded6994', 'season: mov w1,w21 -> BL slot reader 0x1ADB7EC, XVar season_num bootstrap writes the slot value (so the 0x60010 inline readers see it too)'),
-        (0x600cc, 'e103142a', '21008052', 'season: mov w1,w20 -> movz w1,#1 before SetAndNotify(season_state, ch3)'),
-        (0x72efc0, 'e3031f2a', '23008052', 'season: mov w3,wzr -> movz w3,#1, XVar OverrideEnabled default true'),
+        # v8 rollback (field test: even a fresh save hung at the loading screen, so the hang is a global loading-path issue,
+        # not save migration): the v6 season spoof group below is removed - IsSeasonsInitialized @0x5FF0C (29 callers read the
+        # bootstrap-owned flag; offline the bootstrap exits early at its gate and never raises it, so "always 1" walks every
+        # caller into the uninitialized seasonal branch), Season::Num()/State() stubs @0x72E090/0x72E0A0 (a hard 30/1 pair
+        # makes the world loader treat season 30 as live with no data behind it) and OverrideEnabled default @0x72EFC0
+        # (d3hack only sets it together with the OnlineServicePTR spoof flag; alone it is half the pair). Also removed:
+        # the 0x600B8/0x600CC bootstrap Set-parameter rows, so the bootstrap itself is stock too. Kept: the create-flow
+        # point patches (0x351CC4 UI gate, 0x1BD140 season_created slot read, ValidateHero, v7 signin + restored tbz) and
+        # the bss seed row - so eternal saves and fresh heroes load exactly like v2, and seasonal creation still
+        # gets as far as the UI allows; what a seasonal hero does on world entry is the next field question.
         (0x56b10, 'f44fbea9', '20008052', 'season: stp x20,x19,[sp,#-0x20]! -> movz w0,#1, IsSignedInOnline always true (d3hack signin 01; 2.7.6 address unchanged on 2.7.7, per-user profile getter, same patch shape), fixes the "not connected to servers" block on seasonal hero creation'),
         (0x56b14, 'fd7b01a9', 'c0035fd6', 'season: stp x29,x30,[sp,#0x10] -> ret, with the stub above (d3hack signin 02)'),
         # ---- cheat sites: original word -> BL/B to the mini-stub in the patch area (kind D=BL, H=atmosphere hook; tramp=B) ----
@@ -90,7 +91,6 @@ CUTS = {
         (0x97BF28, '0028211e', '847f4594', 'cheat WAR H: site -> mini-stub 0x1ADBD38 (BL)'),
         (0x5020C8, '480300f9', '29675794', 'cheat RES H: site -> mini-stub 0x1ADBD6C (BL)'),
         (0x502454, '09a69352', '4f665794', 'cheat RES H: site -> mini-stub 0x1ADBD90 (BL)'),
-        (0x5FF0C, '20008052', '20008052', 'v5: keep the season movz w0,#1 (0x5FF0C is a leaf without LR save; the v4 BL dispatcher dead-looped it, audit A1) - the reloaders still drive the dispatcher'),
         (0x1A482CF, '00', '1e', 'v5: pre-seed the file-backed bss season slot (0x1A482C8+7) with 30, the 0x600B8 bootstrap BL reads it before any dispatcher run (audit A3)'),
     ],
 }
