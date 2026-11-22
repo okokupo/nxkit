@@ -17,6 +17,10 @@
 #   Reused bytes are not checked against their CRC: damage inside the old IPA carries over. Use --no-reuse or delete <out.ipa>.idx to rebuild
 import argparse, atexit, collections, concurrent.futures as cf, ctypes, json, os, re, shutil, stat, struct, sys, tempfile, time, zipfile, zlib
 
+def _pread(fd, n, off):   # os.pread is Unix-only; Windows fallback via lseek+read (fd opened binary, position unused elsewhere)
+    if hasattr(os, 'pread'): return os.pread(fd, n, off)
+    os.lseek(fd, off, os.SEEK_SET); return os.read(fd, n)
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'tools'))
 import shader_lib
 
@@ -167,7 +171,7 @@ class Zip:
         left, at = csize, info.header_offset + 30 + nl + el
         h = self.local(e, method, crc, csize, usize, usize >= L32 or csize >= L32)
         while left:
-            b = os.pread(old.fileno(), min(CHUNK, left), at)
+            b = _pread(old.fileno(), min(CHUNK, left), at)
             if not b: sys.exit(f'[RED] pack_ipa: the old IPA ended while {e.name} was copied from it')
             self.w(b); left -= len(b); at += len(b)
         self.central(e, h, method, crc, csize, usize)
@@ -215,7 +219,7 @@ def match(e, row, info, old, idx, apfs):   # one header comparison for both the 
         if (info.compress_type, info.CRC, info.compress_size, info.file_size) != (method, crc, csize, usize): return None
     h = header(e, method, crc, csize, usize, usize >= L32 or csize >= L32)
     if info.header_offset < 0 or info.header_offset + len(h[0]) + csize > idx['ipa'][0]: return None
-    if os.pread(old.fileno(), len(h[0]) + len(data), info.header_offset) != h[0] + data: return None
+    if _pread(old.fileno(), len(h[0]) + len(data), info.header_offset) != h[0] + data: return None
     return h
 
 

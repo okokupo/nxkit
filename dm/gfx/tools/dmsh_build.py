@@ -554,7 +554,7 @@ SSBO = {'vs': abi.C0_SSBO_VS, 'cs': abi.C0_SSBO_CS, 'gs': abi.C0_SSBO_GS, 'ps': 
 def record_index(path):   # → (an open descriptor, {a record's key: its bytes' (start, end)}): shader_split.py writes each record's key at +0x08, its bytes from its marker to the next one
     # Scanned through a read-only mapping that is closed again, so no package stays in this process. Pokopia's ps_rdb.bin (4.25 GB) read and cut into its 105,118
     # records left the process at 8.7 GB, and each fork (every spirv-cross and Metal compile) then took 75 ms instead of 3 with the GIL held: one shader worker at a time (GitHub issue #1036)
-    fd = os.open(path, os.O_RDONLY); n = os.fstat(fd).st_size
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0)); n = os.fstat(fd).st_size
     if not n: return fd, {}
     with mmap.mmap(fd, n, access=mmap.ACCESS_READ) as m:
         offs = [x.start() for x in re.finditer(b'BTCDBTCD', m)] + [n]
@@ -1916,7 +1916,8 @@ def rec_of(key):
         sys.exit(f'[RED] {name} holds no record of shader {key}, which the shader map names: the package and the map come from different shader_split.py runs{old}; '
                  f'split the shaders again (the NSP script does when {dm_dir} is removed)')
     o, e = recs[key]
-    return name, os.pread(fd, e - o, o)
+    if hasattr(os, 'pread'): return name, os.pread(fd, e - o, o)
+    os.lseek(fd, o, os.SEEK_SET); return name, os.read(fd, e - o)   # Windows: no pread; fd position unused elsewhere
 for key in keys: digests[key] = shader_key(key, *rec_of(key))
 def plain_digest(k):   # a paired pixel shader's key, also when it is not built this time
     if k in digests: return digests[k]
