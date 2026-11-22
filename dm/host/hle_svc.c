@@ -329,6 +329,13 @@ static void mem_init_once(void) {
     // The alias and stack sizes come from the game profile (mem_alias / mem_stack, the Mac's alias region as above), the heap takes the rest of mem_reserve
     g_heap  = g_as + 0x10000000; g_heap_cap = RESERVE - DM_GAME_MEM_ALIAS - DM_GAME_MEM_STACK - 0x10000000;
     g_stack = g_heap + g_heap_cap; g_stack_cap = DM_GAME_MEM_STACK;
+    // Horizon has no demand paging: the stack region is committed the moment it is reserved, and games slice thread stacks
+    // straight out of it without a per-slice MapMemory. Here the reserve starts PROT_NONE and only each thread's MapMemory
+    // (rounded to 16 K host pages) opens its slice, which leaves unmapped gaps between slices. D3 2.7.7's
+    // ServerGameManagerWorkerThread ran its stack across such a gap (SIGBUS at sp+0x60, the fault page never mprotected,
+    // then the handler-return retry pinned the thread at 999 ms/s: world frozen, hero model never spawning). Commit the
+    // whole region up front, as hardware does: anonymous RW pages are demand-zero, so nothing is spent until touched.
+    if (mprotect((void *)g_stack, g_stack_cap, PROT_READ | PROT_WRITE)) die("stack region commit");
     g_alias = g_stack + g_stack_cap; g_alias_cap = alias;
     if (!(g_alias_bits = calloc((g_alias_cap >> 18) + 1, sizeof *g_alias_bits))) die("alias region page bitmap calloc");
     if (!(g_alias_exposed = calloc(g_alias_cap / pg / 64 + 1, sizeof *g_alias_exposed))) die("alias exposure bitmap calloc");
