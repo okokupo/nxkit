@@ -297,6 +297,16 @@ static void guest_file_init(void) {
 }
 
 static void *alias_windows_thread(void *arg);
+int nvn_dirty_tracked(uintptr_t a);   // nvn_dirty.c
+static int guest_region_fault(void *addr, int is_write, void *uc) {
+    (void)uc;
+    uintptr_t a = (uintptr_t)addr;
+    if (a < (uintptr_t)g_stack || a >= (uintptr_t)g_alias + g_alias_cap) return 0;   // only the stack and alias regions
+    if (is_write && nvn_dirty_tracked(a)) return 0;                                  // a pool page: nvn_dirty's own hook decides
+    uintptr_t pg = (uintptr_t)getpagesize();
+    if (mprotect((void *)(a & ~(pg - 1)), pg, PROT_READ | PROT_WRITE)) return 0;      // not ours to fix
+    return 1;
+}
 static void *regions_thread(void *arg);
 static void mem_init_once(void) {
     size_t pg = (size_t)getpagesize();
@@ -337,10 +347,22 @@ static void mem_init_once(void) {
     // whole region up front, as hardware does: anonymous RW pages are demand-zero, so nothing is spent until touched.
     if (mprotect((void *)g_stack, g_stack_cap, PROT_READ | PROT_WRITE)) die("stack region commit");
     g_alias = g_stack + g_stack_cap; g_alias_cap = alias;
+    // Guest-region fallback for reads and non-tracked writes: Horizon has no demand paging, so a thread stack the game slices out of the
+    // stack region or the alias region (D3 2.7.7's world-entry workers use both) is usable the moment it is handed out, and the game
+    // never maps it page by page. Here such a page starts PROT_NONE (or gets punched out later), the thread runs into it, and the crash
+    // handler kills the process (v11 world entry: SIGBUS at sp+0x60 in the alias region). Commit the faulting page and retry, as
+    // hardware would. Write faults on pages the nvn dirty-page tracking covers are left to its own hook (registered after this one
+    // runs first, so the address is offered to it by returning 0 here). The heap is deliberately not covered: a wild pointer into it is
+    // a real bug on hardware too, and crashing on it keeps the report.
+    
     if (!(g_alias_bits = calloc((g_alias_cap >> 18) + 1, sizeof *g_alias_bits))) die("alias region page bitmap calloc");
     if (!(g_alias_exposed = calloc(g_alias_cap / pg / 64 + 1, sizeof *g_alias_exposed))) die("alias exposure bitmap calloc");
     if (!(g_alias_rel = calloc(g_alias_cap / pg / 64 + 1, sizeof *g_alias_rel)) || !(g_alias_aged = calloc(g_alias_cap / pg / 64 + 1, sizeof *g_alias_aged))) die("alias release bitmap calloc");
     LOG("guest AS %p +%#llx  heap %p alias %p stack %p", g_as, (unsigned long long)g_reserve, g_heap, g_alias, g_stack);
+    {   // the fallback described above; mprotect and atomic-free logic only, signal-handler safe
+        static int registered;
+        if (!registered) { registered = 1; dm_fault_hook_register(guest_region_fault); }
+    }
     if ((uint64_t)(uintptr_t)g_alias > UINT64_C(1) << 39) LOG("[mem] the heap and stacks reach past 2^39, which a Switch's addresses never do: a crash on a cut-off pointer points here (DM_ALIAS_SIZE=<profile's mem_alias> keeps them lower)");
     const char *aw = getenv("DM_ALIAS_WINDOWS");
     if (aw && atoi(aw) > 0) { pthread_t th; if (!pthread_create(&th, NULL, alias_windows_thread, (void *)(uintptr_t)atoi(aw))) pthread_detach(th); }
