@@ -297,12 +297,12 @@ static void guest_file_init(void) {
 }
 
 static void *alias_windows_thread(void *arg);
-int nvn_dirty_tracked(uintptr_t a);   // nvn_dirty.c
+int nvn_dirty_any_range(uintptr_t a);   // nvn_dirty.c
 static int guest_region_fault(void *addr, int is_write, void *uc) {
     (void)uc;
     uintptr_t a = (uintptr_t)addr;
     if (a < (uintptr_t)g_stack || a >= (uintptr_t)g_alias + g_alias_cap) return 0;   // only the stack and alias regions
-    if (is_write && nvn_dirty_tracked(a)) return 0;                                  // a pool page: nvn_dirty's own hook decides
+    if (is_write && nvn_dirty_any_range(a)) return 0;                                  // a pool page: nvn_dirty's own hook decides
     uintptr_t pg = (uintptr_t)getpagesize();
     if (mprotect((void *)(a & ~(pg - 1)), pg, PROT_READ | PROT_WRITE)) return 0;      // not ours to fix
     return 1;

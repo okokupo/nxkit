@@ -100,8 +100,8 @@ static int release_page(range_t *r, uintptr_t p, _Atomic uint64_t *count) {
     }
 }
 // Signal-safe: does the dirty-page tracking cover this address (a live pool range)? The guest-region fallback hook in hle_svc.c asks this
-// so a write fault on a tracked pool page passes through to on_fault here instead of being papered over with an mprotect.
-int nvn_dirty_tracked(uintptr_t a) {
+// so a write fault on a tracked pool page passes through to on_fault here instead of being papered over with an mprotect. (Named any_range: nvn_dirty_tracked with a span already exists.)
+int nvn_dirty_any_range(uintptr_t a) {
     int n = atomic_load(&g_nr);
     for (int i = 0; i < n; i++) { range_t *r = rg(i); if (live_at(i) && a >= r->base && a < r->end) return 1; }
     return 0;
