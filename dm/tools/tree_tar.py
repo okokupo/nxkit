@@ -7,7 +7,11 @@
 #   tar and <folder>.gone       stopped while the pack removed the folder: the tar is complete, the rest goes
 #   <folder>.unpack, <tar>.part unfinished, they go
 # unpack takes a lock on the parent folder that pack releases: regress.py's chain builds share a game's compile cache with the NSP script, and neither may pack it under the other.
-import fcntl, os, shutil, subprocess, time
+try:
+    import fcntl, os, shutil, subprocess, time
+except ImportError:   # Windows: no fcntl, and os.open on a directory raises: single-process runs take no lock (same as the no-flock drive branch in _lock)
+    import os, shutil, subprocess, time
+    fcntl = None
 from pathlib import Path
 
 QUIET_DAYS, QUIET_MIN_FILES, QUIET_FREE = 14, 100, 20 * 2**30   # pack_quiet
@@ -26,6 +30,7 @@ def _remove(p):
 
 
 def _lock(folder, say=None):   # without say, it does not wait: False while another process holds the lock
+    if fcntl is None: return True
     parent = str(Path(folder).parent)
     if parent in _locks or not os.path.isdir(parent): return True
     fd = os.open(parent, os.O_RDONLY)
