@@ -301,13 +301,20 @@ int nvn_dirty_any_range(uintptr_t a);   // nvn_dirty.c
 static int guest_region_fault(void *addr, int is_write, void *uc) {
     (void)uc;
     uintptr_t a = (uintptr_t)addr;
-    if (a < (uintptr_t)g_stack || a >= (uintptr_t)g_alias + g_alias_cap) return 0;   // only the stack and alias regions
+    if (a < (uintptr_t)g_stack || a >= (uintptr_t)g_as + g_reserve + 0x10000) return 0;   // the stack and alias regions and the tail guard
     if (is_write && nvn_dirty_any_range(a)) return 0;                                  // a pool page: nvn_dirty's own hook decides
     uintptr_t pg = (uintptr_t)getpagesize();
     if (mprotect((void *)(a & ~(pg - 1)), pg, PROT_READ | PROT_WRITE)) return 0;      // not ours to fix
     return 1;
 }
 static void *regions_thread(void *arg);
+// Open the 16 K page at a thread stack top (hle_thread.c CreateThread): Horizon hands stacks out ready and code reads up to 0x30 past the top
+void dm_guest_stack_top_open(uint64_t top) {
+    uint64_t B = top & ~0x3FFFull;
+    if (B >= (uintptr_t)g_stack && B < (uintptr_t)g_as + g_reserve + 0x10000)
+        if (mprotect((void *)(uintptr_t)B, 0x4000, PROT_READ | PROT_WRITE))
+            LOG("[RED] CreateThread stack top %#llx: mprotect errno=%d (left to the fault fallback)", (unsigned long long)B, errno);
+}
 static void mem_init_once(void) {
     size_t pg = (size_t)getpagesize();
     if (RESERVE < 0x10000000 || DM_GAME_MEM_ALIAS > RESERVE - 0x10000000 ||
@@ -325,7 +332,11 @@ static void mem_init_once(void) {
     const char *as = getenv("DM_ALIAS_SIZE");
     if (as && *as) { alias = (size_t)strtoull(as, NULL, 0); if (alias < 0x10000000 || (alias & (pg - 1))) die("DM_ALIAS_SIZE %s: at least 256 MB, in whole host pages", as); }
     g_reserve = RESERVE - DM_GAME_MEM_ALIAS + alias;
-    g_as = mmap(NULL, g_reserve, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    // 64 K of guard past the reserve: a thread stack the game slices flush against the top of the block (D3 2.7.7 v12: stack top B=0x440000000
+    // = g_as+g_reserve, the first frame read at B+0x30 faulted outside every mapping, SIGSEGV) reads up to 0x30 past B, as it can on hardware
+    // where the neighbouring allocation of the pool it carved from is live. The guard stays outside g_reserve: the game never sees it, the
+    // guest fault fallback below still covers it.
+    g_as = mmap(NULL, g_reserve + 0x10000, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
     if (g_as == MAP_FAILED) die("reserve guest AS");
     guest_file_init();
     // Fixed partition (all inside the reserved block): 256 MB in front, the heap, the stacks, then the alias region. Mario: a heap region of 1.625 GB, stack 256 MB, alias 2.875 GB.

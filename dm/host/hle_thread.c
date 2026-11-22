@@ -319,6 +319,7 @@ static void lock_acquire_for(thr_t *t, uint64_t addr, uint32_t tag) {
 
 // ---------- Threads ----------
 extern void dm_thread_enter(uint64_t entry, uint64_t arg, uint64_t sp);   // entry.S
+void dm_guest_stack_top_open(uint64_t top);   // hle_svc.c: commit the stack-top page (Horizon hands stacks out ready)
 uint32_t (*dm_thread_tick_fn)(void);   // Gets the current game tick; registered when diag.c initializes (unit tests do not register it, the tick number is recorded as 0)
 void crash_thread_init(void);
 void guest_thread_init(void);   // thread.c: the single place that sets the per-thread TSD slots (x18, TLS, TLR)
@@ -1021,6 +1022,10 @@ static int svc_thread_impl(int num, uint64_t *regs) {
         thr_t *t = calloc(1, sizeof *t);
         pthread_cond_init(&t->cv, NULL); pthread_cond_init(&t->pcv, NULL);
         t->entry = regs[1]; t->arg = regs[2]; t->stack_top = regs[3] & ~0xFull;
+        // Horizon hands the stack out ready: the game never maps it per page, and code reads up to 0x30 past the top (parameters the caller
+        // of the thread entry left above the initial sp, a neighbour's data on hardware). hle_svc.c opens the 16 K page there, so the first
+        // epilogue-style [sp+0x60] cannot fault (D3 2.7.7 v9/v11: SIGBUS at sp+0x60 on a page nobody had mapped). Idempotent when mapped.
+        dm_guest_stack_top_open(t->stack_top);
         // Core -2 (IdealCoreUseProcessValue) = the process's default ideal core (0 for this game), with an affinity mask of just that core - as in the Horizon kernel. It used to be recorded as -2 and GetCurrentProcessorNumber answered -2;
         //   SMBW's font engine picks its per-core engine slot by the current core number and crashed indexing with -2 (main +0x107dbc0, SequenceBackgroundWorker thread)
         t->prio = (int)regs[4]; t->core = (int)regs[5] >= 0 ? (int)regs[5] : 0; t->mask = 1ull << t->core;
