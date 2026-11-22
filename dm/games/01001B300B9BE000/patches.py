@@ -36,7 +36,7 @@ CUTS = {
         (0x600cc, 'e103142a', '21008052', 'season: mov w1,w20 -> movz w1,#1 before SetAndNotify(season_state, ch3)'),
         (0x72efc0, 'e3031f2a', '23008052', 'season: mov w3,wzr -> movz w3,#1, XVar OverrideEnabled default true'),
         # ---- cheat sites: original word -> BL/B to the mini-stub in the patch area (kind D=BL, H=atmosphere hook; tramp=B) ----
-        (0x20636C, '0038211e', '25556394', 'cheat QOL D: site -> mini-stub 0x1ADB800 (BL)'),
+        (0x20636C, '0038211e', '0038211e', 'v5: site restored to the original fsub s0,s0,s1 (0x206340 is a leaf returning s0; the v4 BL stub dead-looped it, audit A2)'),
         (0x40FA20, '08590211', '7f2f5b94', 'cheat QOL D: site -> mini-stub 0x1ADB81C (BL)'),
         (0x1DCFA4, '08e10111', '25fa6394', 'cheat QOL D: site -> mini-stub 0x1ADB838 (BL)'),
         (0x236D20, 'e80f1e32', 'cd926294', 'cheat QOL D: site -> mini-stub 0x1ADB854 (BL)'),
@@ -82,10 +82,11 @@ CUTS = {
         (0x97BF28, '0028211e', '847f4594', 'cheat WAR H: site -> mini-stub 0x1ADBD38 (BL)'),
         (0x5020C8, '480300f9', '29675794', 'cheat RES H: site -> mini-stub 0x1ADBD6C (BL)'),
         (0x502454, '09a69352', '4f665794', 'cheat RES H: site -> mini-stub 0x1ADBD90 (BL)'),
-        (0x5FF0C, '20008052', 'bfef6994', 'cheat dispatcher: the season IsSeasonsInitialized cut (movz w0,#1) -> BL dispatcher 0x1ADBE08 (env->flags, returns w0=1)'),
+        (0x5FF0C, '20008052', '20008052', 'v5: keep the season movz w0,#1 (0x5FF0C is a leaf without LR save; the v4 BL dispatcher dead-looped it, audit A1) - the reloaders still drive the dispatcher'),
         (0xC71870, 'd0260090', 'b0a93914', 'cheat reloader: nn::hid::GetNpadStates(NpadHandheldState) PLT stub word0 (adrp x16) -> B reloader 0x1ADBF30'),
         (0xC71890, 'd0260090', 'b8a93914', 'cheat reloader: nn::hid::GetNpadStates(NpadFullKeyState) PLT stub word0 (adrp x16) -> B reloader 0x1ADBF70'),
         (0xC718A0, 'd0260090', 'c4a93914', 'cheat reloader: nn::hid::GetNpadStates(NpadJoyDualState) PLT stub word0 (adrp x16) -> B reloader 0x1ADBFB0'),
+        (0x1A482CF, '00', '1e', 'v5: pre-seed the file-backed bss season slot (0x1A482C8+7) with 30, the 0x600B8 bootstrap BL reads it before any dispatcher run (audit A3)'),
     ],
 }
 
