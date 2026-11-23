@@ -93,7 +93,7 @@ CUTS = {
         (0x1bf5f0, 'ff0304d1', '00008052', 'season v10: sub sp,sp,#0x100 -> movz w0,#0, ValidateHeroForPartyMember returns error_none (d3hack 08)'),
         (0x56b10, 'f44fbea9', '20008052', 'season v14: stp x20,x19,[sp,#-0x20]! -> movz w0,#1, IsSignedInOnline always true (d3hack signin 01; 2.7.7 verified). v10-v13 created seasonal heroes into "not connected" because the creation confirm flow checks sign-in state; v17 replaces the former 0x61668 companion with the d3hack-parity entry kill below (0x61620/24)'),
         (0x56b14, 'fd7b01a9', 'c0035fd6', 'season v14: stp x29,x30,[sp,#0x10] -> ret, with the row above (d3hack signin 02)'),
-        (0x61620, 'f30f1ef8', '00008052', 'season v17: str x19,[sp,#-0x20]! -> movz w0,#0 (d3hack hideonline_02; 2.7.6 0x061620 same address, zero drift, entry verified: prologue + bl 0x56A30 + four gates inside). Kills the online-feature-visibility function at entry - d3hack never fixes the internal 0x57140/0x7BC90 gates, it bypasses them all; also hides the dead Connect entry and makes the v14-era [0xc90] vtable crash path unreachable),
+        (0x61620, 'f30f1ef8', '00008052', 'season v17: hideonline_02 - movz w0,#0 at the online-feature-visibility entry (d3hack 2.7.6 0x061620, zero drift; entry verified). Kills the function whole: the internal 0x57140/0x7BC90 gates become dead code, the dead Connect entry hides, and the v14-era 0xc90 vtable crash path is unreachable'),
         (0x61624, 'fd7b01a9', 'c0035fd6', 'season v17: stp x29,x30,[sp,#0x10] -> ret (d3hack hideonline_03)'),
         (0x1bd08c, '9d8bfa97', 'b47b6494', 'diag P5 (v15): the seasonal SetGameParams block ran (world load or creation)'),
 
