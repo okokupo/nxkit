@@ -851,21 +851,29 @@ const char *dm_module_dir(void) { return g_module_dir; }
 //   [0x1AA6000, 0x1AA8000)  padding after the image, dm-unclaimed, zero-filled - the only safe zone
 //   [0x1AA8000, 0x1AAC000)  key page (K18/KTLS/KTLR/KGATE), read-only after install_key_page
 //   [0x1AAC000, 0x1AB0000)  frame-step state reservation (loader.c fps_state_off >= key_page_off + 0x4000)
-//   [0x1AB0000, ...)        the patch area (RX)
-// v19b: the table sits at 0x1AA72C8 on the padding page 0x1AA7000 (game cannot reach past its own bss, dm
-// claims nothing there), and this function bootstrap-maps that page anonymous RW before writing, so the write
-// works whatever state the page is in (belt and braces: today the W remap already leaves it RW). Idempotent:
-// the page holds nothing but zeros and the table, which the same call rewrites right after the map.
+//   [0x1AB0000, ...)        the patch area (RX) - v19c audit: NO all-zero 16K page exists there (rewriter stubs
+//                           fill every page), so a patch-area table would collide; ruled out
+// v19c (v19b lesson: iOS maps at 16K granularity, mmap of the misaligned 0x1AA7000 EINVALed and the table was
+// never written - the stubs then read an effectively unusable page and the game died entering the world). The
+// table stays at 0x1AA72C8; the bootstrap now maps the WHOLE aligned 16K page [0x1AA4000, 0x1AA8000) anonymous
+// RW once at boot. That page = bss tail [0x1AA4000, 0x1AA6000) + the padding [0x1AA6000, 0x1AA8000): pure zeros,
+// no file content, no relocations target it (all 54747 RELATIVE entries checked), and it ends exactly at the key
+// page, which stays untouched. Mapping once: after DT_INIT the game owns the bss half, and a mid-game re-map
+// (gear-menu toggle) would re-zero it; later calls write the table directly on the boot-mapped page.
 void dm_d3_flags_write(void) {
     for (int i = 0; i < g_nmod; i++) {
         module_t *m = &g_mod[i];
         if (strcmp(m->name, "main") || !m->loaded) continue;
         if (m->size < 0x1AA72D0) return;
-        uint8_t *f = (uint8_t *)m->base + 0x1AA7000;
-        if (mmap(f, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
-            LOG("d3 flags: table page mmap failed (%s), leaving the table untouched", strerror(errno));
-            return;
+        static int s_flag_page_ready;
+        if (!s_flag_page_ready) {
+            if (mmap((uint8_t *)m->base + 0x1AA4000, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
+                LOG("d3 flags: table page mmap failed (%s), leaving the table untouched", strerror(errno));
+                return;
+            }
+            s_flag_page_ready = 1;
         }
+        uint8_t *f = (uint8_t *)m->base + 0x1AA7000;
         static const char *const envs[5] = {"DM_CHEAT_QOL", "DM_CHEAT_LEVEL", "DM_CHEAT_DROP", "DM_CHEAT_WAR", "DM_CHEAT_RES"};
         for (int j = 0; j < 5; j++) { const char *e = getenv(envs[j]); f[0x2C9 + j] = (uint8_t)(e && atoi(e) ? 1 : 0); }
         const char *s = getenv("DM_SEASON_NUM");

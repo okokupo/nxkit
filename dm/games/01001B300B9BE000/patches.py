@@ -135,3 +135,11 @@ BINDING = [
      'why': 'v6 field test: seasonal hero creation blocked by "not connected to servers"; d3hack applies patch_signin unconditionally',
      'checked': '2.7.7 re-disassembly: 0x56B10 is the per-user profile getter (cmp w0,#3 user-index bound + profile array at 0x114AA30, stride 0x1e98), prologue stp pair matches the d3hack patch site shape'},
 ]
+
+
+# v19c build-side layout gates (loader.c dm_d3_flags_write must match): the table lives in the post-bss
+# padding below the key page, and its bootstrap page is 16K aligned (iOS granularity; v19b's 0x1AA7000
+# mmap EINVALed). Key page [0x1AA8000, 0x1AAC000) per d3work main.gates.tsv (KEY_PAGE_OFF) - build 2607a74f.
+assert 0x1AA6000 <= 0x1AA72C8 < 0x1AA8000, 'flag table drifted out of the bss..key-page padding'
+assert (0x1AA4000 & 0x3FFF) == 0, 'bootstrap page must be 16K aligned'
+assert 0x1AA72D0 <= 0x1AA8000, 'table end must stay below the key page'
