@@ -301,7 +301,7 @@ int nvn_dirty_any_range(uintptr_t a);   // nvn_dirty.c
 static int guest_region_fault(void *addr, int is_write, void *uc) {
     (void)uc;
     uintptr_t a = (uintptr_t)addr;
-    if (a < (uintptr_t)g_stack || a >= (uintptr_t)g_as + g_reserve + 0x10000) return 0;   // the stack and alias regions and the tail guard
+    if (a < (uintptr_t)g_as || a >= (uintptr_t)g_as + g_reserve + 0x10000000) return 0;   // anywhere in the committed reservation (heap stays excluded only for genuinely wild pointers: it is committed too now, a wild read there no longer faults - the price of hardware semantics)
     if (is_write && nvn_dirty_any_range(a)) return 0;                                  // a pool page: nvn_dirty's own hook decides
     uintptr_t pg = (uintptr_t)getpagesize();
     if (mprotect((void *)(a & ~(pg - 1)), pg, PROT_READ | PROT_WRITE)) return 0;      // not ours to fix
@@ -311,9 +311,7 @@ static void *regions_thread(void *arg);
 // Open the 16 K page at a thread stack top (hle_thread.c CreateThread): Horizon hands stacks out ready and code reads up to 0x30 past the top
 void dm_guest_stack_top_open(uint64_t top) {
     uint64_t B = top & ~0x3FFFull;
-    if (B >= (uintptr_t)g_stack && B < (uintptr_t)g_as + g_reserve + 0x10000)
-        if (mprotect((void *)(uintptr_t)B, 0x4000, PROT_READ | PROT_WRITE))
-            LOG("[RED] CreateThread stack top %#llx: mprotect errno=%d (left to the fault fallback)", (unsigned long long)B, errno);
+    if (B >= (uintptr_t)g_as + g_reserve) LOG("[RED] CreateThread stack top %#llx lies past the reservation (guard end %#llx): the allocator walked out - report this log", (unsigned long long)B, (unsigned long long)((uintptr_t)g_as + g_reserve + 0x10000000));
 }
 static void mem_init_once(void) {
     size_t pg = (size_t)getpagesize();
@@ -336,7 +334,7 @@ static void mem_init_once(void) {
     // = g_as+g_reserve, the first frame read at B+0x30 faulted outside every mapping, SIGSEGV) reads up to 0x30 past B, as it can on hardware
     // where the neighbouring allocation of the pool it carved from is live. The guard stays outside g_reserve: the game never sees it, the
     // guest fault fallback below still covers it.
-    g_as = mmap(NULL, g_reserve + 0x10000, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    g_as = mmap(NULL, g_reserve + 0x10000000, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
     if (g_as == MAP_FAILED) die("reserve guest AS");
     guest_file_init();
     // Fixed partition (all inside the reserved block): 256 MB in front, the heap, the stacks, then the alias region. Mario: a heap region of 1.625 GB, stack 256 MB, alias 2.875 GB.
@@ -356,7 +354,12 @@ static void mem_init_once(void) {
     // ServerGameManagerWorkerThread ran its stack across such a gap (SIGBUS at sp+0x60, the fault page never mprotected,
     // then the handler-return retry pinned the thread at 999 ms/s: world frozen, hero model never spawning). Commit the
     // whole region up front, as hardware does: anonymous RW pages are demand-zero, so nothing is spent until touched.
-    if (mprotect((void *)g_stack, g_stack_cap, PROT_READ | PROT_WRITE)) die("stack region commit");
+    // v15: commit the WHOLE reservation at once. Four crashes (v9 stack region, v11 alias head, v12 AS top, v14 exactly +0x10000 into the
+    // 64 K guard) share one invariant: the fault is always [thread stack top B]+0x30, and B follows the committed extent - every page dm
+    // leaves PROT_NONE is a future B the game's allocator will sit a stack on. Horizon has no demand paging: the reservation is usable the
+    // moment it exists. Anonymous RW pages are demand-zero, so nothing is spent until touched; unmaps (guest_release) re-protect their
+    // ranges as before. The 256 MB tail guard absorbs allocator walks past g_reserve (v14 walked one +0x10000 step per newly mapped page).
+    if (mprotect((void *)g_as, g_reserve + 0x10000000, PROT_READ | PROT_WRITE)) die("reserve commit");
     g_alias = g_stack + g_stack_cap; g_alias_cap = alias;
     // Guest-region fallback for reads and non-tracked writes: Horizon has no demand paging, so a thread stack the game slices out of the
     // stack region or the alias region (D3 2.7.7's world-entry workers use both) is usable the moment it is handed out, and the game
@@ -1059,9 +1062,14 @@ uint64_t svc_dispatch(int num, uint64_t *regs, uint64_t orig_addr) {
         uint32_t res = (regs[1] && regs[2] >= 4) ? *(uint32_t *)regs[1] : 0;
         module_t *mm = module_of((void *)regs[30]);
         static int nb;
+        if (regs[0] & 0x80000000ull) {   // probe notification (patches.py diag stubs P1-P5): one line, no backtrace, 30 fires per site
+            static struct { uint64_t site; int n; } probe_seen[32];
+            int k = 0; while (k < 32 && probe_seen[k].site && probe_seen[k].site != orig_addr) k++;
+            if (k < 32) { if (!probe_seen[k].site) probe_seen[k].site = orig_addr; if (probe_seen[k].n++ < 30) LOG("probe#%d reason=%#llx svc at %s+%#llx", probe_seen[k].n, regs[0], mm ? mm->name : "?", orig_addr); }
+            return 0;
+        }
         LOG("Break#%d reason=%#llx Result=%#x svc at %s+%#llx", ++nb, regs[0], res, mm ? mm->name : "?", orig_addr);
         dm_backtrace(regs[29]);
-        if (regs[0] & 0x80000000ull) return 0;   // notification only, can continue
         _exit(42);
     }
     case 0x1E: guest_clock_read_wait(); regs[0] = 0; regs[1] = guest_ticks(); return 0;   // GetSystemTick
