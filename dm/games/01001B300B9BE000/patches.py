@@ -143,3 +143,32 @@ BINDING = [
 assert 0x1AA6000 <= 0x1AA72C8 < 0x1AA8000, 'flag table drifted out of the bss..key-page padding'
 assert (0x1AA4000 & 0x3FFF) == 0, 'bootstrap page must be 16K aligned'
 assert 0x1AA72D0 <= 0x1AA8000, 'table end must stay below the key page'
+
+# v19c audit gate D1 (mechanizes the stub-target audit): decode every adrp/add page base our patch blobs
+# emit, and require that any unsigned-offset load whose computed target falls in the table's page
+# [0x1AA7000, 0x1AA8000) lands inside the table bytes [0x1AA72C8, 0x1AA72D0). Pure python, no capstone
+# dependency (the rewriter may run without it). Season-layer accesses to the game's own globals
+# (0x1098000..0x115CA14) and the stubs' own data (env strings, digest) are out of the table page and pass.
+def _dm_flag_gate():
+    import struct as _s
+    for _bid, _rows in PATCH_AREA_CUTS.items():
+        for _off, _ob, _nb, _why in _rows:
+            _b = bytes.fromhex(_nb)
+            _pg = {}
+            for _o in range(0, len(_b) - 3, 4):
+                _w = _s.unpack_from('<I', _b, _o)[0]
+                _pc = _off + _o
+                if (_w & 0x9F000000) == 0x90000000:
+                    _imm = ((_w >> 29) & 3) | (((_w >> 5) & 0x7FFFF) << 2)
+                    if _imm & (1 << 20): _imm -= 1 << 21
+                    _pg[_w & 31] = ((_pc & ~0xFFF) + (_imm << 12))
+                elif (_w & 0x9F000000) == 0x91000000:
+                    _rd, _rn, _i12 = _w & 31, (_w >> 5) & 31, (_w >> 10) & 0xFFF
+                    if _rn in _pg: _pg[_rd] = _pg[_rn] + _i12
+                elif (_w >> 24 & 0x3F) in (0x39, 0x3D):
+                    _rn = (_w >> 5) & 31
+                    if _rn in _pg:
+                        _t = _pg[_rn] + (((_w >> 10) & 0xFFF) << (_w >> 30))
+                        assert not (0x1AA7000 <= _t < 0x1AA8000) or (0x1AA72C8 <= _t < 0x1AA72D0), \
+                            'flag access %#x (blob %#x +%#x) escaped the table' % (_t, _off, _o)
+_dm_flag_gate()

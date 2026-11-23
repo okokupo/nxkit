@@ -860,6 +860,10 @@ const char *dm_module_dir(void) { return g_module_dir; }
 // no file content, no relocations target it (all 54747 RELATIVE entries checked), and it ends exactly at the key
 // page, which stays untouched. Mapping once: after DT_INIT the game owns the bss half, and a mid-game re-map
 // (gear-menu toggle) would re-zero it; later calls write the table directly on the boot-mapped page.
+// v19c audit gate D2 (compile-time, mechanizes the alignment/bounds audit):
+_Static_assert((0x1AA4000 & 0x3FFF) == 0, "flag bootstrap page must be 16K aligned (iOS granularity)");
+_Static_assert(0x1AA6000 <= 0x1AA72C8 && 0x1AA72D0 <= 0x1AA8000, "flag table must stay in the padding below the key page");
+
 void dm_d3_flags_write(void) {
     for (int i = 0; i < g_nmod; i++) {
         module_t *m = &g_mod[i];
@@ -885,6 +889,10 @@ void dm_d3_flags_write(void) {
     }
 }
 #else
+// v19c audit gate D2 (compile-time, mechanizes the alignment/bounds audit):
+_Static_assert((0x1AA4000 & 0x3FFF) == 0, "flag bootstrap page must be 16K aligned (iOS granularity)");
+_Static_assert(0x1AA6000 <= 0x1AA72C8 && 0x1AA72D0 <= 0x1AA8000, "flag table must stay in the padding below the key page");
+
 void dm_d3_flags_write(void) {}
 #endif
 
