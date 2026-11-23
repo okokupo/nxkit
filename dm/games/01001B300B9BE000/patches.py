@@ -105,7 +105,7 @@ CUTS = {
         (0x652b4, 'fd7b16a9', '41db6994', 'season v16: OnSeasonsFileRetrieved entry -> offline seasons stub (force success + select one of 24 prebaked [Season N] Start/End texts by the menu slot at 0x1A482CF, no writes to the RX patch area)'),
         (0x5ff0c, '00010012', '20008052', 'season v16: IsSeasonsInitialized -> movz w0,#1 (d3hack seasonal_04, back per full-set decision; the data layer now exists so the 29 callers see consistent state)'),
         (0x5ff0c, '20008052', '20008052', 'season v16: chained verify row for the row above'),
-        (0x1bd140, 'a00940b9', 'd5038052', 'season v16: season_created <- 30 (d3hack seasonal_05 full set; known limit: menu season number applies to XVar but created heroes still say 30)'),
+        (0x1bd140, '159140b9', 'd5038052', 'season v16: season_created <- 30 (d3hack seasonal_05 full set; known limit: menu season number applies to XVar but created heroes still say 30)'),
         (0x1bf5f4, 'f76300f9', 'c0035fd6', 'season v10: str x23,[sp,#0xc0] -> ret, pair of the movz above (d3hack 09)'),
         (0x172c40, 'ffc302d1', 'c0035fd6', 'season v10: journey detail opener -> ret, the journey data chain is server-fed and NULL-crashes offline (v6: 0x172d48); click is a no-op until a later round fakes the container'),
         (0x72e090, 'e0500090', '60b74e14', 'season v10: adrp x0 -> b lazy-init stub_A 0x1ADBE10 (presets XVar num/state, init flag, service gate, OverrideEnabled, then replays adrp x0 and falls into the original ldr/b)'),
