@@ -834,23 +834,38 @@ const char *dm_module_dir(void) { return g_module_dir; }
 
 #if DM_GAME_PROGRAM_ID == 0x01001B300B9BE000ull
 // v6 (Diablo III 2.7.7): the engine cheat flags and the runtime season, written straight into the flag table
-// (v19: 0x1AA82C8, see below; v6-v18 lived at bss 0x1A482C8). Up to v5 a patch-area dispatcher read them
+// (v19b: 0x1AA72C8, see below; v6-v18 lived at bss 0x1A482C8). Up to v5 a patch-area dispatcher read them
 // with getenv on the guest side, but the guest's musl environ is empty (v5diag: six g_getenv NULL) and its 7th
 // re-entrant call crashed at pc=main+0x1adbef0, so that whole chain is cut from patches.py. The host reads the same
 // DM_CHEAT_*/DM_SEASON_NUM values from its own environment (launcher settings.tsv rows / Documents/env.txt) and
-// writes the bytes the 46 mini-stubs and Season::Num()/season_created/bootstrap read. Called from dm_main after
-// relocation (before nnMain) and again on every gear-menu toggle (front_ios.m dm_setting_live, after the launcher
-// putenv'd the new value), so switches are hot with no guest-side polling.
-// v19: the table lives at 0x1AA82C8 in the dead zone past main's bss end (0x1AA6000..0x1AB0000: zero-filled W
-// bytes the game cannot legally touch). The old site 0x1A482C8 sat inside a game-constructed bss object whose
-// DT_INIT static init corrupted the bytes after this write - the cheats came up default-on with garbage season
-// bytes (v18_cheat_default_triage.md: log "d3 flags ... 0" yet the v17 crash dump read flag=1).
+// writes the bytes the 46 mini-stubs and Season::Num()/season_created/bootstrap read. Called from the boot
+// (host_preload on iOS: load_modules, then this, before nnMain) and again on every gear-menu toggle
+// (front_ios.m dm_setting_live, after the launcher putenv'd the new value), so switches are hot with no polling.
+//
+// v19b crash postmortem (v19_regression_audit.md): the flag table must avoid BOTH ends of the gap past main's
+// bss (bss ends 0x1AA6000, patch area starts 0x1AB0000). v6-v18's bss site sat inside a game-constructed object
+// whose DT_INIT corrupted the bytes after this write (cheats default-on, garbage season). v19's 0x1AA82C8 landed
+// ON THE KEY PAGE: install_key_page (map_image) had already mprotect'd [KEY_PAGE_OFF 0x1AA8000, +0x4000)
+// read-only, and writing a read-only private mapping on Darwin raises SIGBUS, not SIGSEGV - the boot died at
+// dm_d3_flags_write+0xec on the first flag byte (v19_crash_host_write.txt). The module layout past bss:
+//   [0x1AA6000, 0x1AA8000)  padding after the image, dm-unclaimed, zero-filled - the only safe zone
+//   [0x1AA8000, 0x1AAC000)  key page (K18/KTLS/KTLR/KGATE), read-only after install_key_page
+//   [0x1AAC000, 0x1AB0000)  frame-step state reservation (loader.c fps_state_off >= key_page_off + 0x4000)
+//   [0x1AB0000, ...)        the patch area (RX)
+// v19b: the table sits at 0x1AA72C8 on the padding page 0x1AA7000 (game cannot reach past its own bss, dm
+// claims nothing there), and this function bootstrap-maps that page anonymous RW before writing, so the write
+// works whatever state the page is in (belt and braces: today the W remap already leaves it RW). Idempotent:
+// the page holds nothing but zeros and the table, which the same call rewrites right after the map.
 void dm_d3_flags_write(void) {
     for (int i = 0; i < g_nmod; i++) {
         module_t *m = &g_mod[i];
         if (strcmp(m->name, "main") || !m->loaded) continue;
-        if (m->size < 0x1AA82D0) return;
-        uint8_t *f = (uint8_t *)m->base + 0x1AA8000;
+        if (m->size < 0x1AA72D0) return;
+        uint8_t *f = (uint8_t *)m->base + 0x1AA7000;
+        if (mmap(f, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
+            LOG("d3 flags: table page mmap failed (%s), leaving the table untouched", strerror(errno));
+            return;
+        }
         static const char *const envs[5] = {"DM_CHEAT_QOL", "DM_CHEAT_LEVEL", "DM_CHEAT_DROP", "DM_CHEAT_WAR", "DM_CHEAT_RES"};
         for (int j = 0; j < 5; j++) { const char *e = getenv(envs[j]); f[0x2C9 + j] = (uint8_t)(e && atoi(e) ? 1 : 0); }
         const char *s = getenv("DM_SEASON_NUM");

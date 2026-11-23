@@ -138,7 +138,7 @@ static void host_preload(int argc, char **argv) {
     }
     if (!n) n = profile_modules(argv[1], names);
     load_modules(argv[1], names, n);
-    dm_d3_flags_write();   // v6 (Diablo III): engine cheat flags + runtime season straight into main's bss slot 0x1A482C8 (loader.c) — the guest getenv chain is gone
+    dm_d3_flags_write();   // v6 (Diablo III): engine cheat flags + runtime season straight into the flag table (loader.c, v19b 0x1AA72C8) — the guest getenv chain is gone
     dm_cheats_init();   // the Atmosphère cheat files for this build (hle_cheats.c): picked by first 16 hex digits of main's build ID, which the loader knows now
     dm_sdk_major();   // logs the SDK version, which SDK-dependent behaviour follows (loader.c)
     uint64_t ta = now_ns();

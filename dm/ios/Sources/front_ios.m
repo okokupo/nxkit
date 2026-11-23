@@ -292,7 +292,7 @@ bool dm_setting_live(const char *env, const char *value) {
     if (!strncmp(env, "DM_SW2_GL_", 9) || !strncmp(env, "DM_SW2_GR_", 9)) { if (value) dm_switch2_paddle_live(env, value); return true; }   // the Switch 2 back paddles (the NULL query only lists them)
     if (!strncmp(env, "DM_CHEAT_", 9)) {
         // In-game gear-menu toggles (settings.tsv rows behind fixups:DM_CHEATS). LauncherSettings.choose has
-        // already putenv'd the new value; writes the engine flag bytes straight into the flag table at 0x1AA82C8+1..+5 (v19 dead zone; was bss 0x1A482C8, game-corrupted)
+        // already putenv'd the new value; writes the engine flag bytes straight into the flag table at 0x1AA72C8+1..+5 (v19b padding page below the key page)
         // (dm_d3_flags_write, loader.c) — the patch-area getenv dispatcher is gone, so the switch takes effect at once,
         // no guest-side polling.
         if (value) { dm_d3_flags_write(); LOG("front end: cheat %s = %s (engine flags written)", env, value); }
@@ -300,7 +300,7 @@ bool dm_setting_live(const char *env, const char *value) {
     }
     if (!strcmp(env, "DM_SEASON_NUM")) {
         // The in-game season picker (settings.tsv choice row behind fixups:DM_CHEATS): the same host direct write
-        // puts the number into the runtime season slot (0x1AA82C8+7, v19 dead zone) that Season::Num()/season_created/bootstrap
+        // puts the number into the runtime season slot (0x1AA72C8+7, v19b) that Season::Num()/season_created/bootstrap
         // read. New heroes only.
         if (value) { dm_d3_flags_write(); LOG("front end: season num %s (season slot written)", value); }
         return true;
