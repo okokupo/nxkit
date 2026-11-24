@@ -49,9 +49,11 @@ DM_PSO_PREBUILD	toggle	-	1	gfxapi:nvn	Performance	Pipeline prebuild	The first st
 DM_NVN_ENC_THREAD	toggle	-	1|DM_GAME_ENC_THREAD	gfxapi:nvn	Performance	Encode thread
 DM_FPS_HOLD	toggle	on/off	DM_GAME_FPS_HOLD	DM_GAME_FPS_TARGET!=0	Performance	Hold frames when late
 DM_METAL_HUD	toggle	-	0	always	Performance	Performance HUD
-DM_CHEAT_QOL	toggle	-	0	fixups:DM_CHEATS	Game	便利	快速鉴定/制作/附魔、魔盒免材料、宝石满级、自动拾取金币材料、快速回城等 17 站
-DM_CHEAT_LEVEL	toggle	-	0	fixups:DM_CHEATS	Game	升级	大秘境升级必满级、层数直达 150、暴击 3100% —— 3 站
-DM_CHEAT_DROP	toggle	-	0	fixups:DM_CHEATS	Game	掉落	远古/传奇掉率 100%、赛季专属掉落、牧牛杖等 9 站
-DM_CHEAT_WAR	toggle	-	0	fixups:DM_CHEATS	Game	无敌	无限血/蓝、一击必杀、技能无冷却、伤害×1亿 —— 15 站
-DM_CHEAT_RES	toggle	-	0	fixups:DM_CHEATS	Game	资源	金币/血岩碎片/材料锁定不减 —— 2 站
+DM_CHEAT_QOL	toggle	-	0	fixups:DM_CHEATS	Game	便利	快速鉴定/制作/附魔、魔盒免材料、宝石满级、自动拾取金币材料、快速回城等 17 站	ingame=1
+DM_CHEAT_LEVEL	toggle	-	0	fixups:DM_CHEATS	Game	升级	大秘境升级必满级、层数直达 150、暴击 3100% —— 3 站	ingame=1
+DM_CHEAT_DROP	toggle	-	0	fixups:DM_CHEATS	Game	掉落	远古/传奇掉率 100%、赛季专属掉落、牧牛杖等 9 站	ingame=1
+DM_CHEAT_WAR	toggle	-	0	fixups:DM_CHEATS	Game	无敌	无限血/蓝、一击必杀、技能无冷却、伤害×1亿 —— 15 站	ingame=1
+DM_CHEAT_RES	toggle	-	0	fixups:DM_CHEATS	Game	资源	金币/血岩碎片/材料锁定不减 —— 2 站	ingame=1
+DM_CHEAT_RES_VALUE	value	1-4294967295	1337	fixups:DM_CHEATS	Game	金手指: 资源数值	[v20] 资源写入数值（默认 1337，最大 4294967295）	ingame=1
+DM_SEASONAL_WORLD	toggle	-	1	fixups:DM_CHEATS	Game	赛季世界强制	[v20] seasonal_10 spawn 门强制位（修复 NPC 对话/主线卡死）；默认开，关闭=回到原版门行为	ingame=1
 DM_SEASON_NUM	choice	14=Season 14,15=Season 15,16=Season 16,17=Season 17,18=Season 18,19=Season 19,20=Season 20,21=Season 21,22=Season 22,24=Season 24,25=Season 25,26=Season 26,27=Season 27,28=Season 28,29=Season 29,30=Season 30,31=Season 31,32=Season 32,33=Season 33,34=Season 34,35=Season 35,36=Season 36,37=Season 37	30	fixups:DM_CHEATS	Game	赛季号	作用于新建赛季角色

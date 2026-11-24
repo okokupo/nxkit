@@ -17,6 +17,7 @@ SCHEMA = 1   # launcher.json's version (docs/launcher.schema.json); it grows onl
 META = {
     'level': r'basic',                       # a setting a front end shows first; without it, the front end decides
     'needs': r'DM_[A-Z0-9_]+=[^;=]+',        # <VAR>=<value>: a sub-setting, drawn only while the row that sets <VAR> has that value
+    'ingame': r'1',                            # v20: row only shown in the in-game gear menu, not the startup page (cheat switches)
 }
 
 
@@ -124,6 +125,11 @@ def build(gid, patched, control):
             if var == 'DM_RENDER_SCALE' and keys.get('RENDER_SCALE', '1') != '1':   # a stub that also raises the size: up to its largest scale (the rewriter's RENDER_SCALE, hex as every header value)
                 hi = float(int(keys['RENDER_SCALE'], 16))
             s.update(min=lo, max=hi, step=st)
+        elif kind == 'value':
+            # v20: a free numeric field (DM_CHEAT_RES_VALUE) - values is lo-hi, the front end offers a keypad
+            lo, hi = (int(x) for x in values.split('-'))
+            if not lo <= int(s['default']) <= hi: sys.exit(f'settings.tsv:{n}: a value default within {values}: {s["default"]}')
+            s.update(min=lo, max=hi)
         elif kind == 'toggle':
             if s['default'] not in ('0', '1'): sys.exit(f'settings.tsv:{n}: a toggle defaults to 0 or 1: {s["default"]}')
             on_off = ['1', '0'] if values == '-' else values.split('/')

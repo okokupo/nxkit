@@ -85,7 +85,7 @@ typedef struct {
 } module_t;
 
 extern module_t *g_mod;         // allocated once from the NSO list and NRO manifest; module addresses stay stable
-void dm_d3_flags_write(void);   // v6 (Diablo III 01001B300B9BE000): write the engine cheat flags + runtime season into the flag table at 0x1AA72C8 (v19c: 16K page [0x1AA4000,0x1AA8000) boot-mapped anon RW; v19b misaligned mmap EINVALed; v19 hit the key page) from the host environment (loader.c; empty unless this build is the game)
+void dm_d3_flags_write(void);   // v6 (Diablo III 01001B300B9BE000): write the engine cheat flags + runtime season into the flag table at 0x1AE02C8 (v20: dm-exclusive anon RW page past the patch areaage [0x1AA4000,0x1AA8000) boot-mapped anon RW; v19b misaligned mmap EINVALed; v19 hit the key page) from the host environment (loader.c; empty unless this build is the game)
 extern int g_nmod;
 // main's build ID (empty if none): code with fixed addresses in a game's module runs only on the build they were found in
 static inline const char *dm_main_build(void) { for (int i = 0; i < g_nmod; i++) if (!strcmp(g_mod[i].name, "main")) return g_mod[i].build_id; return ""; }

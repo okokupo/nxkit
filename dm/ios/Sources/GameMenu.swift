@@ -25,7 +25,7 @@ private func gameMenuItems() -> [UIMenuElement] {
         for section in m.sections {
             var rows: [UIMenuElement] = section == "Controls" ? [layout] : []
             if section == "Controls" { placed = true }
-            for s in m.rows(in: section) where (s.kind == "choice" || s.kind == "toggle") && dm_setting_live(s.env, nil) { rows.append(gameMenuRow(m, s)) }
+            for s in m.rowsInGame(in: section) where (s.kind == "choice" || s.kind == "toggle" || s.kind == "value") && dm_setting_live(s.env, nil) { rows.append(gameMenuRow(m, s)) }
             if !rows.isEmpty { items.append(UIMenu(options: .displayInline, children: rows)) }
         }
     }
@@ -37,6 +37,12 @@ private func gameMenuRow(_ m: LauncherModel, _ s: Setting) -> UIMenuElement {
     let now = m.values[s.env] ?? s.def, fixed = m.fixed.contains(s.env)
     let attributes: UIMenuElement.Attributes = fixed ? .disabled : []
     func pick(_ v: String) { m.choose(s, v); _ = dm_setting_live(s.env, v) }
+    if s.kind == "value" {
+        // v20: a free numeric field (DM_CHEAT_RES_VALUE): shows the current value, opens a keypad dialog
+        let a = UIAction(title: "\(s.label): \(now)", attributes: attributes) { _ in askValue(m, s) }
+        if fixed { a.subtitle = "Set in env.txt" }
+        return a
+    }
     if s.kind == "toggle" {
         let a = UIAction(title: s.label, attributes: attributes, state: now == s.onValue ? .on : .off) { _ in pick(now == s.onValue ? s.offValue : s.onValue) }
         if fixed { a.subtitle = "Set in env.txt" }
@@ -46,4 +52,25 @@ private func gameMenuRow(_ m: LauncherModel, _ s: Setting) -> UIMenuElement {
     let current = options.first { $0[0] == now }?[1] ?? now
     let actions = options.map { o in UIAction(title: o[1], attributes: attributes, state: o[0] == now ? .on : .off) { _ in pick(o[0]) } }
     return UIMenu(title: s.label, subtitle: fixed ? "\(current), set in env.txt" : nil, options: .singleSelection, children: actions)
+}
+
+// v20: a numeric setting's keypad dialog (DM_CHEAT_RES_VALUE). Non-blocking, straight on the main thread - unlike front_text_input,
+// which parks the calling (guest) thread on a semaphore and so cannot be used from a UIKit action closure without deadlocking
+private func askValue(_ m: LauncherModel, _ s: Setting) {
+    let now = m.values[s.env] ?? s.def
+    let ac = UIAlertController(title: s.label, message: "1 – \(Int(s.max ?? 4294967295))", preferredStyle: .alert)
+    ac.addTextField { f in f.text = now; f.keyboardType = .numberPad }
+    ac.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+        guard let t = ac.textFields?.first?.text, s.accepts(t) else { return }
+        m.choose(s, t)
+        _ = dm_setting_live(s.env, t)
+    })
+    ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    var vc: UIViewController?
+    for scene in UIApplication.shared.connectedScenes where scene is UIWindowScene {
+        for window in (scene as! UIWindowScene).windows where window.isKeyWindow { vc = window.rootViewController }
+    }
+    while let p = vc?.presentedViewController { vc = p }   // the menu can sit over an already-presented sheet
+    guard let vc = vc else { return }
+    vc.present(ac, animated: true)
 }

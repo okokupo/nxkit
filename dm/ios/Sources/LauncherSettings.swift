@@ -8,6 +8,7 @@ struct Setting: Decodable, Identifiable {
     let needs: String?     // "<VAR>=<value>": a sub-setting, drawn only while that setting has that value
     let level: String?     // "basic": shown first (the Mac window's Basic settings); any other or none: Advanced settings. The iPhone keeps one list
     let base: Base?        // render scale: the 3D views' size at 1.0, docked and handheld, for the size in pixels (the Mac window)
+    let ingame: String?    // v20: "1" - the row lives in the in-game gear menu only (cheat switches; GameMenu.swift), never on the startup screen
     struct Base: Decodable { let docked, handheld: [Int] }
     let options: [[String]]?   // choice: [value, label]
     let min, max, step: Double?   // range
@@ -27,10 +28,13 @@ struct Setting: Decodable, Identifiable {
             guard !v.contains(where: { $0 == "x" || $0 == "X" }), let n = Double(v), n.isFinite, let lo = min, let hi = max else { return false }   // no hex: launcher.c's check agrees
             return n >= lo && n <= hi
         case "toggle": return v == onValue || v == offValue
+        case "value":   // v20: a free numeric field (DM_CHEAT_RES_VALUE); digits only, within min...max
+            guard let lo = min, let hi = max, let n = Double(v), v.allSatisfy({ $0.isNumber }) else { return false }
+            return n >= lo && n <= hi
         default: return true
         }
     }
-    enum CodingKeys: String, CodingKey { case env, kind, label, note, def = "default", section, needs, level, base, options, min, max, step, on, off }
+    enum CodingKeys: String, CodingKey { case env, kind, label, note, def = "default", section, needs, level, base, ingame, options, min, max, step, on, off }
 }
 struct SettingsFile: Decodable { let settings: [Setting] }
 
@@ -70,7 +74,10 @@ final class LauncherModel: ObservableObject {
         guard let v = values[key] else { return true }
         return v == want
     }
-    func rows(in section: String) -> [Setting] { settings.filter { $0.sectionTitle == section && visible($0) } }
+    var inGameOnly: Bool { ingame == "1" }   // v20: the cheat rows, in the in-game gear menu only
+    func rows(in section: String) -> [Setting] { settings.filter { $0.sectionTitle == section && visible($0) && !$0.inGameOnly } }
+    // v20: the in-game gear menu (GameMenu.swift) draws the in-game-only rows too; the startup screen and the Mac window use rows(in:), which drops them
+    func rowsInGame(in section: String) -> [Setting] { settings.filter { $0.sectionTitle == section && visible($0) } }
     // The Mac window: Basic settings first, then Advanced settings, each in the list's sections and order
     func sections(basic: Bool) -> [String] {
         settings.filter { $0.basic == basic }.reduce(into: []) { if !$0.contains($1.sectionTitle) { $0.append($1.sectionTitle) } }

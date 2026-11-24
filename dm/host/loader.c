@@ -657,6 +657,7 @@ void loader_hash_log(void) {
 // with PC-relative addresses, so the modules are mapped at the image's canonical layout: one reservation holding the code memory at 0 and every module at the offset jit.tsv gives
 // it (mod rows), the distances the image was built for. Modules the layout does not name are mapped as before
 static uint8_t *g_jit_base; static uint64_t g_jit_span;
+static int g_flag_ext_ok;   // v20: main's reservation includes the +0x4000 flag-table extension page (0x1AE0000)
 static struct { char name[16]; uint64_t off, size, pre; } g_jit_mod[256]; static int g_njit_mod;
 // Where the image is: DM_JIT_SERVE; on iOS also the folder "jit" beside the RomFS folder (the app's jit/, staged with the RomFS). NULL: the plugin runs (the Mac's default)
 const char *dm_jit_serve_dir(void) {
@@ -771,8 +772,16 @@ static void map_image(module_t *m, const char *dir) {
     uint64_t pre = front ? (uint64_t)-m->patch_off : 0;
     if (front) m->patch_len = z1;
     vm_address_t base = 0; uint8_t *slot = jit_slot(m, m->size, pre);
+    unsigned long ext = 0;
+#if DM_GAME_PROGRAM_ID == 0x01001B300B9BE000ull
+    // v20: reserve one extra page past the patch area for the engine flag table (dm_d3_flags_write maps it
+    // anonymous RW there). The page lives INSIDE our own reservation, so the later MAP_FIXED cannot touch any
+    // foreign mapping (v19c's bootstrap MAP_FIXED into the middle of the W COW remap is gone). JIT layouts have
+    // no headroom -> g_flag_ext_ok stays 0 and the flag write fails safe (cheats off, season defaults via stub_A)
+    if (!slot) { ext = 0x4000; g_flag_ext_ok = 1; }
+#endif
     if (slot) base = (vm_address_t)slot - pre;   // inside the jit layout's reservation
-    else if (vm_allocate(mach_task_self(), &base, pre + m->size, VM_FLAGS_ANYWHERE) != KERN_SUCCESS) die("%s failed to reserve %#llx bytes of address space", m->name, (unsigned long long)(pre + m->size));
+    else if (vm_allocate(mach_task_self(), &base, pre + m->size + ext, VM_FLAGS_ANYWHERE) != KERN_SUCCESS) die("%s failed to reserve %#llx bytes of address space", m->name, (unsigned long long)(pre + m->size + ext));
     base += pre;
     remap_at(m, base, x0, z0, FALSE, VM_PROT_READ | VM_PROT_EXECUTE);
     remap_at(m, base + z0, w, zw, TRUE, VM_PROT_READ | VM_PROT_WRITE);
@@ -842,49 +851,56 @@ const char *dm_module_dir(void) { return g_module_dir; }
 // (host_preload on iOS: load_modules, then this, before nnMain) and again on every gear-menu toggle
 // (front_ios.m dm_setting_live, after the launcher putenv'd the new value), so switches are hot with no polling.
 //
-// v19b crash postmortem (v19_regression_audit.md): the flag table must avoid BOTH ends of the gap past main's
-// bss (bss ends 0x1AA6000, patch area starts 0x1AB0000). v6-v18's bss site sat inside a game-constructed object
-// whose DT_INIT corrupted the bytes after this write (cheats default-on, garbage season). v19's 0x1AA82C8 landed
-// ON THE KEY PAGE: install_key_page (map_image) had already mprotect'd [KEY_PAGE_OFF 0x1AA8000, +0x4000)
-// read-only, and writing a read-only private mapping on Darwin raises SIGBUS, not SIGSEGV - the boot died at
-// dm_d3_flags_write+0xec on the first flag byte (v19_crash_host_write.txt). The module layout past bss:
-//   [0x1AA6000, 0x1AA8000)  padding after the image, dm-unclaimed, zero-filled - the only safe zone
-//   [0x1AA8000, 0x1AAC000)  key page (K18/KTLS/KTLR/KGATE), read-only after install_key_page
-//   [0x1AAC000, 0x1AB0000)  frame-step state reservation (loader.c fps_state_off >= key_page_off + 0x4000)
-//   [0x1AB0000, ...)        the patch area (RX) - v19c audit: NO all-zero 16K page exists there (rewriter stubs
-//                           fill every page), so a patch-area table would collide; ruled out
-// v19c (v19b lesson: iOS maps at 16K granularity, mmap of the misaligned 0x1AA7000 EINVALed and the table was
-// never written - the stubs then read an effectively unusable page and the game died entering the world). The
-// table stays at 0x1AA72C8; the bootstrap now maps the WHOLE aligned 16K page [0x1AA4000, 0x1AA8000) anonymous
-// RW once at boot. That page = bss tail [0x1AA4000, 0x1AA6000) + the padding [0x1AA6000, 0x1AA8000): pure zeros,
-// no file content, no relocations target it (all 54747 RELATIVE entries checked), and it ends exactly at the key
-// page, which stays untouched. Mapping once: after DT_INIT the game owns the bss half, and a mid-game re-map
-// (gear-menu toggle) would re-zero it; later calls write the table directly on the boot-mapped page.
-// v19c audit gate D2 (compile-time, mechanizes the alignment/bounds audit):
-_Static_assert((0x1AA4000 & 0x3FFF) == 0, "flag bootstrap page must be 16K aligned (iOS granularity)");
-_Static_assert(0x1AA6000 <= 0x1AA72C8 && 0x1AA72D0 <= 0x1AA8000, "flag table must stay in the padding below the key page");
+// v20 flag table: 0x1AE02C8, on a dm-exclusive anonymous RW page [0x1AE0000, 0x1AE4000) reserved one page past
+// the patch area (map_image, inside OUR vm_allocate reservation - the MAP_FIXED below can only ever hit our own
+// hole, never a foreign mapping). History of this address:
+//   v6-v18  0x1A482C8  game bss, inside a runtime-constructed object -> DT_INIT + runtime indexed writes corrupt
+//                      the flags (cheats default-on, garbage season; see v18_position_audit.md - the location is
+//                      live game memory, physically incompatible with a write-once host)
+//   v19     0x1AA82C8  ON the key page (install_key_page mprotect READ) -> SIGBUS at boot (crash log confirmed)
+//   v19b    0x1AA72C8  gap below the key page; the misaligned 0x1AA7000 bootstrap mmap EINVALed on iOS 16K pages
+//   v19c    0x1AA72C8  aligned-page bootstrap [0x1AA4000,0x1AA8000): the ONLY MAP_FIXED into the interior of a
+//                      vm_remap'ed COW region in this tree - static analysis says the gap was ALREADY RW via the
+//                      W remap (z0+zw==patch_off is load-checked), so the bootstrap was unnecessary; device flash
+//                      crash cause unconfirmed (no log) - v20_build_state.md. The pattern is retired with v20
+//   v20     0x1AE02C8  game-unreachable by construction (address never appears in game code/data; past the patch
+//                      area end; no static refs/relocs possible), host-writable, 16K aligned, build-gated
+// Table layout (page-relative, stubs use adrp x17, 0x1AE0000):
+//   +0x2C8 unused  +0x2C9..0x2CD QOL/LEVEL/DROP/WAR/RES  +0x2CE state  +0x2CF season
+//   +0x2D0 RES value u64 (DM_CHEAT_RES_VALUE, default 1337; the RES stub ldr's it instead of the movz literal)
+//   +0x2D8 seasonal-world force byte (DM_SEASONAL_WORLD, default 1; seasonal_10 gate stub reads it)
+// v20 audit gate D2 (compile-time, mechanizes the alignment/bounds audit):
+_Static_assert((0x1AE0000 & 0x3FFF) == 0, "flag extension page must be 16K aligned (iOS granularity)");
+_Static_assert(0x1AE0000 >= 0x1AB0000 && 0x1AE02DC <= 0x1AE4000, "flag table must live on the extension page past the patch area");
 
 void dm_d3_flags_write(void) {
     for (int i = 0; i < g_nmod; i++) {
         module_t *m = &g_mod[i];
         if (strcmp(m->name, "main") || !m->loaded) continue;
-        if (m->size < 0x1AA72D0) return;
+        if (m->size < 0x1AE0000) return;
+        if (!g_flag_ext_ok) { LOG("d3 flags: no reserved extension page (jit layout?), leaving the table unwritten"); return; }
         static int s_flag_page_ready;
         if (!s_flag_page_ready) {
-            if (mmap((uint8_t *)m->base + 0x1AA4000, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
+            if (mmap((uint8_t *)m->base + 0x1AE0000, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
                 LOG("d3 flags: table page mmap failed (%s), leaving the table untouched", strerror(errno));
                 return;
             }
             s_flag_page_ready = 1;
         }
-        uint8_t *f = (uint8_t *)m->base + 0x1AA7000;
+        uint8_t *f = (uint8_t *)m->base + 0x1AE0000;
         static const char *const envs[5] = {"DM_CHEAT_QOL", "DM_CHEAT_LEVEL", "DM_CHEAT_DROP", "DM_CHEAT_WAR", "DM_CHEAT_RES"};
         for (int j = 0; j < 5; j++) { const char *e = getenv(envs[j]); f[0x2C9 + j] = (uint8_t)(e && atoi(e) ? 1 : 0); }
         const char *s = getenv("DM_SEASON_NUM");
         int sn = s ? atoi(s) : 0;
         f[0x2CF] = (uint8_t)(sn > 0 && sn < 256 ? sn : 30);
-        LOG("d3 flags: qol=%d level=%d drop=%d war=%d res=%d season=%d (host direct-write at %p)",
-            f[0x2C9], f[0x2CA], f[0x2CB], f[0x2CC], f[0x2CD], f[0x2CF], (void *)(f + 0x2C8));
+        const char *rv = getenv("DM_CHEAT_RES_VALUE");
+        unsigned long long rvv = rv ? strtoull(rv, NULL, 0) : 1337ull;
+        if (rvv > 0xFFFFFFFFull) rvv = 0xFFFFFFFFull;
+        *(unsigned long long *)(f + 0x2D0) = rvv;
+        const char *fw = getenv("DM_SEASONAL_WORLD");
+        f[0x2D8] = (uint8_t)(fw ? (atoi(fw) ? 1 : 0) : 1);
+        LOG("d3 flags: qol=%d level=%d drop=%d war=%d res=%d season=%d resval=%llu seasonal_world=%d (host direct-write at %p)",
+            f[0x2C9], f[0x2CA], f[0x2CB], f[0x2CC], f[0x2CD], f[0x2CF], rvv, f[0x2D8], (void *)(f + 0x2C8));
         return;
     }
 }
