@@ -657,7 +657,7 @@ void loader_hash_log(void) {
 // with PC-relative addresses, so the modules are mapped at the image's canonical layout: one reservation holding the code memory at 0 and every module at the offset jit.tsv gives
 // it (mod rows), the distances the image was built for. Modules the layout does not name are mapped as before
 static uint8_t *g_jit_base; static uint64_t g_jit_span;
-static int g_flag_ext_ok;   // v20: main's reservation includes the +0x4000 flag-table extension page (0x1AE0000)
+static int g_flag_ext_ok;   // v20: main's reservation includes the +0xC000 guard/table/guard pages past the patch area (table page 0x1AE4000, guards 0x1AE0000/0x1AE8000)
 static struct { char name[16]; uint64_t off, size, pre; } g_jit_mod[256]; static int g_njit_mod;
 // Where the image is: DM_JIT_SERVE; on iOS also the folder "jit" beside the RomFS folder (the app's jit/, staged with the RomFS). NULL: the plugin runs (the Mac's default)
 const char *dm_jit_serve_dir(void) {
@@ -774,11 +774,14 @@ static void map_image(module_t *m, const char *dir) {
     vm_address_t base = 0; uint8_t *slot = jit_slot(m, m->size, pre);
     unsigned long ext = 0;
 #if DM_GAME_PROGRAM_ID == 0x01001B300B9BE000ull
-    // v20: reserve one extra page past the patch area for the engine flag table (dm_d3_flags_write maps it
-    // anonymous RW there). The page lives INSIDE our own reservation, so the later MAP_FIXED cannot touch any
-    // foreign mapping (v19c's bootstrap MAP_FIXED into the middle of the W COW remap is gone). JIT layouts have
-    // no headroom -> g_flag_ext_ok stays 0 and the flag write fails safe (cheats off, season defaults via stub_A)
-    if (!slot) { ext = 0x4000; g_flag_ext_ok = 1; }
+    // v20g: reserve three extra pages past the patch area - PROT_NONE guard, the engine flag table page (0x1AE4000),
+    // PROT_NONE guard again (dm_d3_flags_write maps them). The guards make any stray access to the table's
+    // neighbourhood fault loudly instead of silently corrupting the switches, and the table page itself idles
+    // read-only (mprotect RW only for the microsecond the host writes). The pages live INSIDE our own reservation,
+    // so the later MAP_FIXED cannot touch any foreign mapping (v19c's bootstrap MAP_FIXED into the middle of the
+    // W COW remap is gone). JIT layouts have no headroom -> g_flag_ext_ok stays 0 and the flag write fails safe
+    // (cheats off, season defaults via stub_A)
+    if (!slot) { ext = 0xC000; g_flag_ext_ok = 1; }
 #endif
     if (slot) base = (vm_address_t)slot - pre;   // inside the jit layout's reservation
     else if (vm_allocate(mach_task_self(), &base, pre + m->size + ext, VM_FLAGS_ANYWHERE) != KERN_SUCCESS) die("%s failed to reserve %#llx bytes of address space", m->name, (unsigned long long)(pre + m->size + ext));
@@ -851,9 +854,13 @@ const char *dm_module_dir(void) { return g_module_dir; }
 // (host_preload on iOS: load_modules, then this, before nnMain) and again on every gear-menu toggle
 // (front_ios.m dm_setting_live, after the launcher putenv'd the new value), so switches are hot with no polling.
 //
-// v20 flag table: 0x1AE02C8, on a dm-exclusive anonymous RW page [0x1AE0000, 0x1AE4000) reserved one page past
-// the patch area (map_image, inside OUR vm_allocate reservation - the MAP_FIXED below can only ever hit our own
-// hole, never a foreign mapping). History of this address:
+// v20g flag table: 0x1AE42C8, on a dm-exclusive anonymous page [0x1AE4000, 0x1AE8000) bracketed by PROT_NONE guard
+// pages [0x1AE0000, 0x1AE4000) and [0x1AE8000, 0x1AEC000), the three reserved one past the patch area (map_image
+// +0xC000, inside OUR vm_allocate reservation - the MAP_FIXED below can only ever hit our own hole, never a
+// foreign mapping). The guards are the point: any stray read/write to the table's neighbourhood faults at once
+// (a loud, attributable crash instead of silently flipped cheat switches), and the table page itself idles
+// PROT_READ - RW only for the microseconds dm_d3_flags_write holds it (boot + each gear-menu toggle), so the
+// silent-corruption window is that write instant alone. History of this address:
 //   v6-v18  0x1A482C8  game bss, inside a runtime-constructed object -> DT_INIT + runtime indexed writes corrupt
 //                      the flags (cheats default-on, garbage season; see v18_position_audit.md - the location is
 //                      live game memory, physically incompatible with a write-once host)
@@ -865,13 +872,15 @@ const char *dm_module_dir(void) { return g_module_dir; }
 //                      crash cause unconfirmed (no log) - v20_build_state.md. The pattern is retired with v20
 //   v20     0x1AE02C8  game-unreachable by construction (address never appears in game code/data; past the patch
 //                      area end; no static refs/relocs possible), host-writable, 16K aligned, build-gated
-// Table layout (page-relative, stubs use adrp x17, 0x1AE0000):
+//   v20g    0x1AE42C8  + PROT_NONE guards both sides + table idles read-only (Chen: silent flag corruption must
+//                      fault loudly)
+// Table layout (page-relative, stubs use adrp x17, 0x1AE4000):
 //   +0x2C8 unused  +0x2C9..0x2CD QOL/LEVEL/DROP/WAR/RES  +0x2CE state  +0x2CF season
 //   +0x2D0 RES value u64 (DM_CHEAT_RES_VALUE, default 1337; the RES stub ldr's it instead of the movz literal)
 //   +0x2D8 seasonal-world force byte (DM_SEASONAL_WORLD, default 1; seasonal_10 gate stub reads it)
 // v20 audit gate D2 (compile-time, mechanizes the alignment/bounds audit):
-_Static_assert((0x1AE0000 & 0x3FFF) == 0, "flag extension page must be 16K aligned (iOS granularity)");
-_Static_assert(0x1AE0000 >= 0x1AB0000 && 0x1AE02DC <= 0x1AE4000, "flag table must live on the extension page past the patch area");
+_Static_assert((0x1AE4000 & 0x3FFF) == 0, "flag table page must be 16K aligned (iOS granularity)");
+_Static_assert(0x1AE4000 > 0x1AB0000 && 0x1AE42DC <= 0x1AE8000, "flag table must live on the guarded page past the patch area");
 
 void dm_d3_flags_write(void) {
     for (int i = 0; i < g_nmod; i++) {
@@ -879,15 +888,21 @@ void dm_d3_flags_write(void) {
         if (strcmp(m->name, "main") || !m->loaded) continue;
         if (m->size < 0x1AE0000) return;
         if (!g_flag_ext_ok) { LOG("d3 flags: no reserved extension page (jit layout?), leaving the table unwritten"); return; }
+        uint8_t *tbl = (uint8_t *)m->base + 0x1AE4000;
         static int s_flag_page_ready;
         if (!s_flag_page_ready) {
-            if (mmap((uint8_t *)m->base + 0x1AE0000, 0x4000, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
-                LOG("d3 flags: table page mmap failed (%s), leaving the table untouched", strerror(errno));
+            // guard | table | guard, all inside our own reservation: MAP_FIXED can only hit our hole (v20g)
+            if (mmap((uint8_t *)m->base + 0x1AE0000, 0x4000, PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED
+             || mmap(tbl, 0x4000, PROT_READ, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED
+             || mmap((uint8_t *)m->base + 0x1AE8000, 0x4000, PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0) == MAP_FAILED) {
+                LOG("d3 flags: guard/table page mmap failed (%s), leaving the table untouched", strerror(errno));
                 return;
             }
             s_flag_page_ready = 1;
         }
-        uint8_t *f = (uint8_t *)m->base + 0x1AE0000;
+        // The table idles read-only (the mini-stubs only read it); open a microsecond write window
+        if (mprotect(tbl, 0x4000, PROT_READ | PROT_WRITE)) { LOG("d3 flags: table mprotect RW failed (%s), keeping the old switches", strerror(errno)); return; }
+        uint8_t *f = tbl;
         static const char *const envs[5] = {"DM_CHEAT_QOL", "DM_CHEAT_LEVEL", "DM_CHEAT_DROP", "DM_CHEAT_WAR", "DM_CHEAT_RES"};
         for (int j = 0; j < 5; j++) { const char *e = getenv(envs[j]); f[0x2C9 + j] = (uint8_t)(e && atoi(e) ? 1 : 0); }
         const char *s = getenv("DM_SEASON_NUM");
@@ -899,8 +914,9 @@ void dm_d3_flags_write(void) {
         *(unsigned long long *)(f + 0x2D0) = rvv;
         const char *fw = getenv("DM_SEASONAL_WORLD");
         f[0x2D8] = (uint8_t)(fw ? (atoi(fw) ? 1 : 0) : 1);
-        LOG("d3 flags: qol=%d level=%d drop=%d war=%d res=%d season=%d resval=%llu seasonal_world=%d (host direct-write at %p)",
+        LOG("d3 flags: qol=%d level=%d drop=%d war=%d res=%d season=%d resval=%llu seasonal_world=%d (guarded write at %p)",
             f[0x2C9], f[0x2CA], f[0x2CB], f[0x2CC], f[0x2CD], f[0x2CF], rvv, f[0x2D8], (void *)(f + 0x2C8));
+        if (mprotect(tbl, 0x4000, PROT_READ)) LOG("d3 flags: table mprotect back to READ failed (%s) - page stays RW this round", strerror(errno));
         return;
     }
 }
