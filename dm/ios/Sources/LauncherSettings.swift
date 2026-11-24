@@ -14,6 +14,7 @@ struct Setting: Decodable, Identifiable {
     let min, max, step: Double?   // range
     let on, off: String?   // toggle: the values the variable takes (1 / 0 when not given)
     var id: String { env }
+    var inGameOnly: Bool { ingame == "1" }   // v20: the cheat rows, in the in-game gear menu only
     var sectionTitle: String { section ?? "Game" }
     var basic: Bool { level == "basic" }
     var onValue: String { on ?? "1" }
@@ -74,7 +75,6 @@ final class LauncherModel: ObservableObject {
         guard let v = values[key] else { return true }
         return v == want
     }
-    var inGameOnly: Bool { ingame == "1" }   // v20: the cheat rows, in the in-game gear menu only
     func rows(in section: String) -> [Setting] { settings.filter { $0.sectionTitle == section && visible($0) && !$0.inGameOnly } }
     // v20: the in-game gear menu (GameMenu.swift) draws the in-game-only rows too; the startup screen and the Mac window use rows(in:), which drops them
     func rowsInGame(in section: String) -> [Setting] { settings.filter { $0.sectionTitle == section && visible($0) } }
